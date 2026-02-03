@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Focus Shield Sync",
+  "version": "1.0",
+  "description": "Helps users stay focused by blocking distracting websites and providing productivity tools.",
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "permissions": [
+  "declarativeNetRequest",
+  "declarativeNetRequestFeedback",
+  "storage",
+  "activeTab"
+],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["blocked.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

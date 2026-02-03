@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1024855875521",
+    "project_id": "focus-shild",
+    "storage_bucket": "focus-shild.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1024855875521:android:56298c78bf52954dd01940",
+        "android_client_info": {
+          "package_name": "com.example.focus_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCOII03qcqyZy-_X_q6LK0rBJjU-nPPgyA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

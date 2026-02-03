@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Privacy Policy — Focus Shield Sync</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;line-height:1.6;padding:32px;max-width:900px;margin:auto;color:#222}
+    header{border-bottom:1px solid #eee;padding-bottom:12px;margin-bottom:18px}
+    h1,h2{color:#111}
+    code{background:#f5f5f5;padding:.1em .3em;border-radius:4px}
+    footer{margin-top:28px;font-size:.9em;color:#666}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Privacy Policy</h1>
+    <p>Last updated: January 23, 2026</p>
+  </header>
+
+  <p><strong>Focus Shield Sync</strong> is a browser extension that helps users stay productive by blocking user-specified distracting websites during timed focus sessions. This privacy policy describes how the extension stores and uses data.</p>
+
+  <h2>Data stored locally</h2>
+  <ul>
+    <li><strong>Blocked sites list</strong> — A list of domains you add to block (stored in <code>chrome.storage.local</code>).</li>
+    <li><strong>Timer and UI preferences</strong> — Timer state, time left, and simple UI preferences (stored in <code>chrome.storage.local</code>).</li>
+    <li>No browsing history, page content, or personally identifiable information is collected by default.</li>
+  </ul>
+
+  <h2>Permissions and why they are required</h2>
+  <ul>
+    <li><strong>declarativeNetRequest</strong> — Used to create/update local blocking rules so navigations to blocked sites are redirected to the extension's internal <code>blocked.html</code> page while Focus mode is active.</li>
+    <li><strong>declarativeNetRequestFeedback</strong> — Used only if the user opts to send feedback about blocked requests; any such feedback is opt-in and anonymized unless the user explicitly provides details.</li>
+    <li><strong>host permissions (e.g., &lt;all_urls&gt;)</strong> — Required to match navigations across sites for blocking. The extension only inspects and acts on <code>main_frame</code> navigations when Focus mode is active and does not transmit page content off-device.</li>
+    <li><strong>storage</strong> — Used to store the blocked sites list and timer preferences locally on the user's device (<code>chrome.storage.local</code>).</li>
+  </ul>
+
+  <h2>Remote code & third-party resources</h2>
+  <p>This extension <strong>does not execute remote code</strong>. It only fetches third-party favicons as images for display in the UI and does not import or run remote scripts.</p>
+
+  <h2>Sharing & third parties</h2>
+  <p>We do not share user data with third parties. Any user-initiated feedback that includes details will be sent only if you explicitly opt in to submit it.</p>
+
+  <h2>Your choices</h2>
+  <p>You can clear or modify the blocked sites list and timer settings at any time through the extension UI. To remove all stored data, uninstall the extension or clear its local storage.</p>
+
+  <h2>Contact</h2>
+  <p>If you have questions, please contact: <strong>replace-with-your-contact@example.com</strong>.</p>
+
+  <footer>
+    <p>By using this extension you agree to the practices described in this policy. This page may be updated; the "Last updated" date will reflect the most recent changes.</p>
+  </footer>
+</body>
+</html>
