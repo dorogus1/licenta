@@ -26,18 +26,47 @@
     <div class="page" id="calendarPage">
         <h3>Schedule</h3>
         
-        <div class="calendar-add-section">
-            <div class="input-group">
-                <input type="text" id="calEventTitle" placeholder="Event (e.g. Deep Work)" />
-            </div>
-            <div class="row-inputs">
-                <input type="datetime-local" id="calEventStart" aria-label="Start Time">
-                <input type="datetime-local" id="calEventEnd" aria-label="End Time">
-            </div>
-            <button id="btnAddEvent" class="auth-btn" style="margin-top: 8px;">+ Add Session</button>
+        <!-- Date Navigation -->
+        <div class="calendar-nav" style="display: flex; justify-content: space-between; align-items: center; background: #252525; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+            <button id="prevDayBtn" class="secondary-btn" style="width: auto; padding: 5px 12px;">&lt;</button>
+            <span id="currentDateDisplay" style="font-weight: bold; color: white;">Today</span>
+            <button id="nextDayBtn" class="secondary-btn" style="width: auto; padding: 5px 12px;">&gt;</button>
         </div>
 
-        <div class="label" style="margin-top: 15px;">Upcoming Sessions</div>
+        <div class="calendar-add-section">
+            <div class="cal-header">
+                <span class="cal-title">New Session</span>
+            </div>
+            
+            <div class="cal-form">
+                <div class="input-wrapper">
+                    <label class="input-label-sm">Activity</label>
+                    <input type="text" id="calEventTitle" class="cal-input" placeholder="e.g. Deep Work" autocomplete="off" />
+                </div>
+
+                <div class="input-wrapper">
+                     <label class="input-label-sm">Date</label>
+                     <input type="date" id="calEventDate" class="cal-input">
+                </div>
+                
+                <div class="time-row">
+                    <div class="time-col">
+                        <label class="input-label-sm">Start Time</label>
+                        <input type="time" id="calEventStartTime" class="cal-input">
+                    </div>
+                    <div class="time-col">
+                        <label class="input-label-sm">End Time</label>
+                        <input type="time" id="calEventEndTime" class="cal-input">
+                    </div>
+                </div>
+                
+                <button id="btnAddEvent" class="cal-add-btn">
+                    <span>+ Schedule Session</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="label" style="margin-top: 15px;">Sessions for this day</div>
         <ul id="calendarList" class="apps-list-ul">
             <li style="color: #666; font-size: 12px; text-align: center;">Loading events...</li>
         </ul>
@@ -68,12 +97,14 @@
       <div id="accountActionsPublic">
         <button id="openLoginBtn" class="auth-btn" style="margin-top:10px; margin-right: 5px;">Login</button>
         <button id="openRegisterBtn" class="auth-btn" style="margin-top:10px;">Create account</button>
+        <button id="themeToggleBtnPublic" class="auth-btn" style="margin-top:10px; background-color: #666;">Toggle Dark Mode</button>
       </div>
       <div id="accountActions" style="display:none;">
         <div class="account-email" id="accountEmail"></div>
         
         <button id="btnConnectCalendar" class="auth-btn" style="margin-top:10px; background-color: #4285F4; border-color: #4285F4;">Sync Calendar Permission</button>
         
+        <button id="themeToggleBtn" class="auth-btn" style="margin-top:10px; background-color: #666;">Toggle Dark Mode</button>
         <button id="resetPasswordBtn" class="auth-btn" style="margin-top:10px;">Reset Password</button>
         <button id="logoutBtn" class="auth-btn" style="margin-top:10px; background-color: #333;">Logout</button>
         <div id="accountMsg" class="auth-error"></div>

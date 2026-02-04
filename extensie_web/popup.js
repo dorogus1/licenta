@@ -1,3 +1,6 @@
+import flatpickr from "flatpickr";
+import "flatpickr/dist/flatpickr.min.css";
+
 // --- Firebase Auth ---
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "firebase/auth";
 import { getDatabase, ref, set, onDisconnect, onValue, push, serverTimestamp, remove } from "firebase/database";
@@ -208,6 +211,27 @@ function initDevices(user) {
                 const session = changes.cachedSession.newValue;
                 console.log('[popup] Cached session updated:', session);
                 handleSessionUpdate(session);
+            }
+            // Listen for Timer/Focus updates from Background (e.g. Calendar trigger)
+            if (changes.timerTimeLeft || changes.timerRunning || changes.timerLastUpdate) {
+                chrome.storage.local.get(['timerTimeLeft', 'timerRunning', 'timerLastUpdate'], (data) => {
+                    // Update local state
+                    if (data.timerRunning && data.timerLastUpdate) {
+                        const now = Date.now();
+                        const elapsed = Math.floor((now - data.timerLastUpdate) / 1000);
+                        timeLeft = Math.max(0, data.timerTimeLeft - elapsed);
+                        
+                        if (!timerRunning) {
+                             startTimer(true, true); // restoring=true, fromSync=true to avoid double sync
+                        }
+                    } else {
+                        timeLeft = data.timerTimeLeft || (25*60);
+                        if (timerRunning) {
+                            stopTimer(true); // fromSync=true
+                        }
+                    }
+                    updateTimerDisplay();
+                });
             }
         }
     });
@@ -432,7 +456,7 @@ function showPage(pageEl) {
 }
 
 if (navTimer) navTimer.addEventListener('click', () => showPage(timerPage));
-if (navCalendar) navCalendar.addEventListener('click', () => { showPage(calendarPage); loadUpcomingEvents(); });
+if (navCalendar) navCalendar.addEventListener('click', () => { showPage(calendarPage); loadEventsForDate(); });
 if (navApps) navApps.addEventListener('click', () => showPage(appsPage));
 if (navDevices) navDevices.addEventListener('click', () => showPage(devicesPage));
 if (navAccount) navAccount.addEventListener('click', () => showPage(accountPage));
@@ -441,13 +465,85 @@ if (navAccount) navAccount.addEventListener('click', () => showPage(accountPage)
 showPage(timerPage);
 
 
+
+// ... (rest of imports)
+
+// ... (keep existing code until Calendar Logic)
+
 // --- CALENDAR LOGIC (Fetch & Add) ---
 const calendarList = document.getElementById('calendarList');
 const btnRefreshCalendar = document.getElementById('btnRefreshCalendar');
 const btnAddEvent = document.getElementById('btnAddEvent');
 const calEventTitle = document.getElementById('calEventTitle');
-const calEventStart = document.getElementById('calEventStart');
-const calEventEnd = document.getElementById('calEventEnd');
+// New Inputs (Text type now handled by flatpickr)
+const calEventDate = document.getElementById('calEventDate');
+const calEventStartTime = document.getElementById('calEventStartTime');
+const calEventEndTime = document.getElementById('calEventEndTime');
+
+// Flatpickr Instances
+let fpDate, fpStart, fpEnd;
+
+function initPickers() {
+    if (!calEventDate) return;
+
+    fpDate = flatpickr(calEventDate, {
+        dateFormat: "Y-m-d",
+        defaultDate: new Date(),
+        disableMobile: true, // Force custom UI
+        static: true, // Position relative to wrapper
+        monthSelectorType: 'static',
+        altInput: true,
+        altFormat: "F j, Y", // "February 4, 2026"
+    });
+
+    fpStart = flatpickr(calEventStartTime, {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: "H:i",
+        time_24hr: true,
+        disableMobile: true,
+        static: true
+    });
+
+    fpEnd = flatpickr(calEventEndTime, {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: "H:i",
+        time_24hr: true,
+        disableMobile: true,
+        static: true
+    });
+}
+
+// Call init
+initPickers();
+
+// Date Navigation Elements
+const prevDayBtn = document.getElementById('prevDayBtn');
+const nextDayBtn = document.getElementById('nextDayBtn');
+const currentDateDisplay = document.getElementById('currentDateDisplay');
+
+let selectedDate = new Date();
+
+function updateDateDisplay() {
+    if (!currentDateDisplay) return;
+    const options = { day: 'numeric', month: 'short', year: 'numeric' };
+    currentDateDisplay.textContent = selectedDate.toLocaleDateString('en-GB', options);
+    
+    // Sync Flatpickr
+    if (fpDate) {
+        fpDate.setDate(selectedDate);
+    }
+}
+
+function changeDate(offset) {
+    selectedDate.setDate(selectedDate.getDate() + offset);
+    updateDateDisplay();
+    loadEventsForDate();
+}
+
+if (prevDayBtn) prevDayBtn.addEventListener('click', () => changeDate(-1));
+if (nextDayBtn) nextDayBtn.addEventListener('click', () => changeDate(1));
 
 async function getCalendarToken() {
     return new Promise((resolve) => {
@@ -461,8 +557,10 @@ async function getCalendarToken() {
     });
 }
 
-async function loadUpcomingEvents() {
+async function loadEventsForDate() {
     if (!calendarList) return;
+    updateDateDisplay();
+    
     calendarList.innerHTML = '<li style="text-align:center; color:#888;">Checking calendar...</li>';
     
     const token = await getCalendarToken();
@@ -471,8 +569,17 @@ async function loadUpcomingEvents() {
         return;
     }
 
-    const now = new Date().toISOString();
-    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${now}&maxResults=10&singleEvents=true&orderBy=startTime`;
+    // Calculate start and end of selectedDate
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const timeMin = startOfDay.toISOString();
+    const timeMax = endOfDay.toISOString();
+
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`;
 
     try {
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -499,7 +606,7 @@ async function loadUpcomingEvents() {
         
         calendarList.innerHTML = '';
         if (!data.items || data.items.length === 0) {
-            calendarList.innerHTML = '<li style="text-align:center;">No upcoming events found.</li>';
+            calendarList.innerHTML = '<li style="text-align:center;">No events for this day.</li>';
             return;
         }
 
@@ -507,13 +614,13 @@ async function loadUpcomingEvents() {
             const start = evt.start.dateTime || evt.start.date;
             const dateObj = new Date(start);
             const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            const dayStr = dateObj.toLocaleDateString([], {month: 'short', day: 'numeric'});
+            // const dayStr = dateObj.toLocaleDateString([], {month: 'short', day: 'numeric'}); // No longer needed as we show day at top
 
             const li = document.createElement('li');
             li.innerHTML = `
                 <div style="flex:1">
                     <div style="font-weight:600; font-size:14px;">${evt.summary || '(No Title)'}</div>
-                    <div style="font-size:12px; color:#666;">${dayStr} • ${timeStr}</div>
+                    <div style="font-size:12px; color:#666;">${timeStr}</div>
                 </div>
             `;
             calendarList.appendChild(li);
@@ -527,11 +634,12 @@ async function loadUpcomingEvents() {
 
 async function addCalendarEvent() {
     const title = calEventTitle.value;
-    const startVal = calEventStart.value;
-    const endVal = calEventEnd.value;
+    const dateVal = calEventDate.value; // Flatpickr updates the hidden input value to YYYY-MM-DD
+    const startVal = calEventStartTime.value; // HH:MM
+    const endVal = calEventEndTime.value; // HH:MM
 
-    if (!title || !startVal || !endVal) {
-        alert("Please fill in all fields");
+    if (!title || !dateVal || !startVal || !endVal) {
+        alert("Please fill in all fields (Title, Date, Start & End Time)");
         return;
     }
 
@@ -541,18 +649,22 @@ async function addCalendarEvent() {
         return;
     }
 
-    // API requires ISO format (add seconds and timezone if missing, but browser handles local usually)
-    // datetime-local gives "2023-10-27T10:00" -> add ":00Z" or rely on local
-    const startDate = new Date(startVal);
-    const endDate = new Date(endVal);
+    // Construct ISO strings
+    const startDateTime = new Date(`${dateVal}T${startVal}`);
+    const endDateTime = new Date(`${dateVal}T${endVal}`);
+
+    if (endDateTime <= startDateTime) {
+         alert("End time must be after Start time.");
+         return;
+    }
 
     const event = {
         'summary': title,
         'start': {
-            'dateTime': startDate.toISOString(),
+            'dateTime': startDateTime.toISOString(),
         },
         'end': {
-            'dateTime': endDate.toISOString(),
+            'dateTime': endDateTime.toISOString(),
         }
     };
 
@@ -572,9 +684,12 @@ async function addCalendarEvent() {
         if (res.ok) {
             // Success
             calEventTitle.value = '';
+            // Clear times
+            if(fpStart) fpStart.clear();
+            if(fpEnd) fpEnd.clear();
+            
             // Refresh list
-            loadUpcomingEvents();
-            // Trigger background check immediately so focus might start if it's "now"
+            loadEventsForDate();
             chrome.alarms.create("checkCalendar", { when: Date.now() + 1000 });
         } else {
             alert("Failed to add event.");
@@ -583,13 +698,11 @@ async function addCalendarEvent() {
         console.error(e);
         alert("Error adding event.");
     } finally {
-        btnAddEvent.textContent = "+ Add Session";
+        btnAddEvent.textContent = "+ Schedule Session";
         btnAddEvent.disabled = false;
     }
 }
 
-if (btnRefreshCalendar) btnRefreshCalendar.addEventListener('click', loadUpcomingEvents);
-if (btnAddEvent) btnAddEvent.addEventListener('click', addCalendarEvent);
 
 
 // --- Auth UI Handling ---
@@ -736,4 +849,35 @@ if (resetBtn) {
     });
 }
 updateTimerDisplay();
+
+// --- DARK MODE LOGIC ---
+const themeToggleBtn = document.getElementById('themeToggleBtn');
+const themeToggleBtnPublic = document.getElementById('themeToggleBtnPublic');
+
+function applyTheme(isDark) {
+    if (isDark) {
+        document.body.classList.add('dark-mode');
+        if (themeToggleBtn) themeToggleBtn.textContent = "Switch to Light Mode";
+        if (themeToggleBtnPublic) themeToggleBtnPublic.textContent = "Switch to Light Mode";
+    } else {
+        document.body.classList.remove('dark-mode');
+        if (themeToggleBtn) themeToggleBtn.textContent = "Switch to Dark Mode";
+        if (themeToggleBtnPublic) themeToggleBtnPublic.textContent = "Switch to Dark Mode";
+    }
+}
+
+// Load preference
+chrome.storage.local.get(['darkMode'], (data) => {
+    applyTheme(!!data.darkMode);
+});
+
+function toggleTheme() {
+    const isDark = document.body.classList.contains('dark-mode');
+    const newState = !isDark;
+    applyTheme(newState);
+    chrome.storage.local.set({ darkMode: newState });
+}
+
+if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
+if (themeToggleBtnPublic) themeToggleBtnPublic.addEventListener('click', toggleTheme);
 

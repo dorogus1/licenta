@@ -271,9 +271,6 @@ async function checkCalendarEvents() {
         const token = await new Promise((resolve, reject) => {
             chrome.identity.getAuthToken({ interactive: false }, (token) => {
                 if (chrome.runtime.lastError || !token) {
-                    // User might not be signed in to Chrome or hasn't granted permission yet.
-                    // We don't force it here to avoid annoying popups. 
-                    // The user should trigger the first sign-in from the UI (Popup).
                     reject(chrome.runtime.lastError);
                 } else {
                     resolve(token);
@@ -282,13 +279,11 @@ async function checkCalendarEvents() {
         });
 
         const now = new Date();
-        const nextMinute = new Date(now.getTime() + 60000); // Check short window
+        const nextMinute = new Date(now.getTime() + 60000); 
 
-        // ISO strings for API
         const timeMin = now.toISOString();
         const timeMax = nextMinute.toISOString();
 
-        // Fetch events from "primary" calendar
         const response = await fetch(
             `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
             {
@@ -307,37 +302,50 @@ async function checkCalendarEvents() {
         const data = await response.json();
         const events = data.items || [];
 
-        // Check if we have any active event
-        // We only care about events that are "busy" (transparency !== 'transparent') usually,
-        // but for now let's assume any event implies Focus unless configured otherwise.
-        
         if (events.length > 0) {
             const currentEvent = events[0];
-            console.log('[calendar] Active event found:', currentEvent.summary);
+            const eventId = currentEvent.id;
+            
+            // Check if this is a new event we haven't handled yet
+            chrome.storage.local.get(['lastEventId', 'focusActive'], (storage) => {
+                if (storage.lastEventId !== eventId) {
+                    console.log('[calendar] New active event found:', currentEvent.summary);
 
-            // AUTO-ENABLE FOCUS
-            chrome.storage.local.get(['focusActive'], (res) => {
-                if (!res.focusActive) {
-                    console.log('[calendar] Enabling Focus Mode due to calendar event.');
-                    chrome.storage.local.set({ focusActive: true });
-                    // Optionally notify the user
-                    chrome.notifications.create({
-                        type: 'basic',
-                        iconUrl: 'icon.png',
-                        title: 'Focus Mode Activated',
-                        message: `Scheduled session: ${currentEvent.summary}`
-                    });
+                    const endStr = currentEvent.end.dateTime || currentEvent.end.date;
+                    // If it's an all-day event (date only), this logic might need tweaking, 
+                    // but usually 'busy' events have times.
+                    if (!endStr) return;
+
+                    const endTime = new Date(endStr).getTime();
+                    const nowTime = Date.now();
+                    const remainingSeconds = Math.floor((endTime - nowTime) / 1000);
+
+                    if (remainingSeconds > 0) {
+                        console.log(`[calendar] Starting timer for ${remainingSeconds}s based on event duration.`);
+                        
+                        chrome.storage.local.set({
+                            focusActive: true,
+                            timerRunning: true,
+                            timerTimeLeft: remainingSeconds,
+                            timerLastUpdate: Date.now(),
+                            lastEventId: eventId
+                        });
+
+                        chrome.notifications.create({
+                            type: 'basic',
+                            iconUrl: 'icon.png',
+                            title: 'Focus Mode Activated',
+                            message: `Event started: ${currentEvent.summary}\nTimer set to ${Math.floor(remainingSeconds/60)}m.`
+                        });
+                    }
                 }
             });
         } else {
-            // Optional: Auto-disable focus if NO event? 
-            // Usually risky to auto-disable, user might want to keep focusing.
-            // Let's leave it manual disable for now, or check if we auto-enabled it.
-            console.log('[calendar] No active events.');
+             // Clear lastEventId so if the same event happens again (unlikely) or just cleanup
+             chrome.storage.local.set({ lastEventId: null });
         }
 
     } catch (err) {
-        // Silent fail is expected if user isn't auth'd yet
         // console.log('[calendar] Check skipped or failed:', err);
     }
 }
