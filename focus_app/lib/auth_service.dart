@@ -335,15 +335,40 @@ class AuthService {
     // Use .json extension for Firebase REST API
     final url = '$_dbUrl/users/$userId/devices/$_deviceId.json?auth=$token';
     
+    String deviceType = 'unknown';
+    String platformName = 'Unknown OS';
+    String deviceName = Platform.localHostname;
+
+    if (Platform.isAndroid) {
+      deviceType = 'android';
+      platformName = 'Android ${Platform.operatingSystemVersion}';
+      // Localhostname is often protected on Android, default to a generic name if generic
+      if (deviceName == 'localhost' || deviceName.isEmpty) {
+        deviceName = 'Android Device';
+      }
+    } else if (Platform.isWindows) {
+      deviceType = 'windows';
+      platformName = 'Windows ${Platform.operatingSystemVersion}';
+    } else if (Platform.isLinux) {
+      deviceType = 'linux';
+      platformName = 'Linux';
+    } else if (Platform.isMacOS) {
+      deviceType = 'macos';
+      platformName = 'macOS';
+    } else if (Platform.isIOS) {
+      deviceType = 'ios';
+      platformName = 'iOS';
+    }
+    
     try {
       await http.patch(
         Uri.parse(url),
         body: json.encode({
-          'name': Platform.localHostname, // e.g. "My-PC"
-          'type': 'windows',
-          'platform': 'Windows ${Platform.operatingSystemVersion}',
+          'name': deviceName,
+          'type': deviceType,
+          'platform': platformName,
           'state': 'online',
-          'last_seen': DateTime.now().millisecondsSinceEpoch, // Server-side timestamp would be better, but this is simpler for REST
+          'last_seen': DateTime.now().millisecondsSinceEpoch,
         }),
       );
     } catch (e) {

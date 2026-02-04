@@ -19,6 +19,14 @@ subprojects {
     afterEvaluate {
         project.extensions.findByName("android")?.let { android ->
             try {
+                // FORCE COMPILE SDK VERSION TO 36
+                val setCompileSdkVersion = android.javaClass.getMethod("compileSdkVersion", Int::class.javaPrimitiveType)
+                setCompileSdkVersion.invoke(android, 36)
+            } catch (e: Exception) {
+                // println("Failed to set compileSdk for ${project.name}: $e")
+            }
+
+            try {
                 val getNamespace = android.javaClass.getMethod("getNamespace")
                 if (getNamespace.invoke(android) == null) {
                     var packageName: String? = null
