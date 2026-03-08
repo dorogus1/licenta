@@ -216,7 +216,7 @@ class AuthService {
     _stopHeartbeat();
     _sendHeartbeatRequest(userId, token);
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 60), (_) => _sendHeartbeatRequest(userId, token));
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) => _pollSession(userId, token));
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) => _pollSession(userId, token));
   }
 
   void _stopHeartbeat() {

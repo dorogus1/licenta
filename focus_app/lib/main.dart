@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'dart:ui'; // Added for FontFeature
 import 'package:flutter/material.dart';
 import 'dart:io' show Platform;
 import 'windows_apps_page.dart';
 import 'mobile_apps_page.dart';
-import 'windows_process_monitor.dart'; // Still needed for some internal types if referenced directly, but better to use facade
+import 'todo_page.dart';
 import 'services/app_blocker_service.dart';
 import 'login_page.dart';
 import 'auth_service.dart';
@@ -186,13 +187,13 @@ class _ProfileDialogState extends State<ProfileDialog> {
                         final id = devices.keys.elementAt(index);
                         final data = devices[id];
                         final isMe = id == currentDeviceId;
-                        
+
                         final type = data['type'] as String? ?? 'unknown';
                         final name = data['name'] as String? ?? 'Unknown Device';
                         final platform = data['platform'] as String? ?? '';
                         final state = data['state'] as String? ?? 'offline';
                         final lastSeen = data['last_seen'] as int? ?? 0;
-                        
+
                         // Online check logic (similar to extension)
                         final now = DateTime.now().millisecondsSinceEpoch;
                         final isOnline = (state != 'offline') && ((now - lastSeen) < 90000); // 90s timeout
@@ -274,7 +275,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
         if (update.endTime != null) {
           final now = DateTime.now().millisecondsSinceEpoch;
           final remaining = ((update.endTime! - now) / 1000).floor();
-          
+
           if (remaining > 0) {
              if (!running || (timeLeft - remaining).abs() > 2) {
                setState(() {
@@ -309,10 +310,8 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
-      // App is minimized or hidden
       widget.authService.updatePresence('offline');
     } else if (state == AppLifecycleState.resumed) {
-      // App is back
       widget.authService.updatePresence('online');
     }
   }
@@ -326,8 +325,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
   void startTimer({bool fromSync = false}) {
     if (running) return;
     setState(() => running = true);
-    
-    // Sync start only if user clicked
+
     if (!fromSync) {
       widget.authService.updateFocusSession(true, DateTime.now().millisecondsSinceEpoch + (timeLeft * 1000));
     }
@@ -338,6 +336,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
         setState(() => timeLeft--);
       } else {
         stopTimer();
+        _showFeedbackDialog();
       }
     });
   }
@@ -345,14 +344,133 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
   void stopTimer({bool fromSync = false}) {
     if (!running) return;
     setState(() => running = false);
-    
-    // Sync stop only if user clicked
+
     if (!fromSync) {
       widget.authService.updateFocusSession(false, null);
     }
 
     _timer?.cancel();
     AppBlockerService.stopFocus();
+  }
+
+  void _showFeedbackDialog() {
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.celebration, size: 64, color: Colors.orangeAccent),
+            const SizedBox(height: 24),
+            const Text('Sesiune Terminată!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            const Text('Ai reușit să finalizezi ce ți-ai propus?', textAlign: TextAlign.center),
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(ApiResponseSnackBar(message: 'Excelent! 🚀'));
+                    },
+                    icon: const Icon(Icons.check),
+                    label: const Text('DA, GATA'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showExtraTimeDialog();
+                    },
+                    icon: const Icon(Icons.more_time),
+                    label: const Text('EXTRA TIMP'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showExtraTimeDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Cât timp extra?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildExtraTimeOption(5, Colors.blue),
+                _buildExtraTimeOption(10, Colors.indigo),
+                _buildExtraTimeOption(15, Colors.purple),
+              ],
+            ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExtraTimeOption(int minutes, Color color) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: () {
+            adjustTime(minutes * 60);
+            startTimer();
+            Navigator.pop(context);
+          },
+          child: Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 2),
+            ),
+            child: Center(
+              child: Text('+$minutes', style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text('min', style: TextStyle(fontSize: 12, color: Colors.grey)),
+      ],
+    );
   }
 
   void adjustTime(int seconds) {
@@ -379,8 +497,15 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        title: const Text('Focus Timer', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Focus Shield', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.playlist_add_check),
+            tooltip: 'Timeline',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => TodoPage(authService: widget.authService)),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.person),
             tooltip: 'Profile',
@@ -398,20 +523,13 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
           ),
           IconButton(
             icon: Icon(widget.isDark ? Icons.light_mode : Icons.dark_mode),
-            tooltip: 'Toggle Theme',
+            tooltip: 'Theme',
             onPressed: widget.toggleTheme,
-          ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            tooltip: 'Schedule',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => CalendarPage(authService: widget.authService)),
-            ),
           ),
           if (Platform.isWindows || Platform.isAndroid)
             IconButton(
               icon: const Icon(Icons.settings),
-              tooltip: 'Manage Blocked Apps',
+              tooltip: 'Apps',
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => Platform.isWindows 
                   ? const WindowsAppsPage() 
@@ -425,7 +543,6 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Timer Circle
             Stack(
               alignment: Alignment.center,
               children: [
@@ -446,10 +563,10 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
                   height: 300,
                   child: CircularProgressIndicator(
                     value: progress,
-                    strokeWidth: 20,
-                    backgroundColor: colorScheme.surface,
+                    strokeWidth: 15,
+                    backgroundColor: colorScheme.surfaceVariant,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      running ? colorScheme.secondary : Colors.grey,
+                      running ? colorScheme.secondary : colorScheme.primary.withOpacity(0.3),
                     ),
                     strokeCap: StrokeCap.round,
                   ),
@@ -460,26 +577,33 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
                     Text(
                       formatTime(timeLeft),
                       style: const TextStyle(
-                        fontSize: 72,
-                        fontWeight: FontWeight.w200,
+                        fontSize: 84,
+                        fontWeight: FontWeight.w100,
                         fontFeatures: [FontFeature.tabularFigures()],
                       ),
                     ),
-                    Text(
-                      running ? 'FOCUSING' : 'PAUSED',
-                      style: TextStyle(
-                        letterSpacing: 4,
-                        color: colorScheme.onBackground.withOpacity(0.6),
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: running ? colorScheme.secondary.withOpacity(0.1) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        running ? 'FOCUSING' : 'READY',
+                        style: TextStyle(
+                          letterSpacing: 4,
+                          fontSize: 14,
+                          color: running ? colorScheme.secondary : colorScheme.onBackground.withOpacity(0.4),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 60),
-            
-            // Controls
+            const SizedBox(height: 80),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -487,33 +611,34 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
                   icon: Icons.remove,
                   onPressed: () => adjustTime(-5 * 60),
                 ),
-                const SizedBox(width: 24),
-                
-                // Play/Pause Big Button
+                const SizedBox(width: 32),
                 FloatingActionButton.large(
                   onPressed: running ? stopTimer : startTimer,
+                  elevation: 4,
                   backgroundColor: running 
                       ? Colors.orangeAccent 
                       : colorScheme.primary,
                   foregroundColor: Colors.white,
                   child: Icon(
                     running ? Icons.pause : Icons.play_arrow, 
-                    size: 40,
+                    size: 48,
                   ),
                 ),
-                
-                const SizedBox(width: 24),
+                const SizedBox(width: 32),
                 _buildControlButton(
                   icon: Icons.add,
                   onPressed: () => adjustTime(5 * 60),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 40),
             TextButton.icon(
               onPressed: resetTimer,
-              icon: const Icon(Icons.refresh, color: Colors.grey),
-              label: const Text('RESET', style: TextStyle(color: Colors.grey)),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('RESET TIMER'),
+              style: TextButton.styleFrom(
+                foregroundColor: colorScheme.onBackground.withOpacity(0.5),
+              ),
             )
           ],
         ),
@@ -526,20 +651,19 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin, 
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          )
-        ]
+        border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.1)),
       ),
       child: IconButton(
         icon: Icon(icon),
-        iconSize: 28,
+        iconSize: 24,
         onPressed: onPressed,
         color: Theme.of(context).colorScheme.onSurface,
       ),
     );
   }
+}
+
+class ApiResponseSnackBar extends SnackBar {
+  final String message;
+  ApiResponseSnackBar({super.key, required this.message}) : super(content: Text(message), duration: const Duration(seconds: 2));
 }
