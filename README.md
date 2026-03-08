@@ -2,6 +2,33 @@
 
 Focus Shield Sync is a comprehensive productivity ecosystem designed to help you maintain focus by minimizing digital distractions. It consists of a cross-platform mobile/desktop application and a browser extension, both synchronized via the cloud to ensure your focus rules apply everywhere.
 
+## 🚀 Ghid de Instalare (Installation Guide)
+
+### 📱 Android (APK)
+Pentru a instala aplicația pe dispozitivul tău Android:
+1. Descarcă fișierul `app-release.apk` din acest folder.
+2. Transferă-l pe telefon (sau descarcă-l direct pe dispozitiv).
+3. Deschide fișierul pe telefon. Dacă sistemul te întreabă, permite "Instalarea din surse necunoscute" (Unknown Sources) din setările browserului sau managerului de fișiere.
+4. Apasă pe **Install** și apoi deschide aplicația.
+
+### 💻 Windows (Desktop)
+Aplicația de Windows poate fi rulată direct din sursă sau instalată ca pachet nativ:
+
+**Varianta Instalabilă (Recomandat):**
+1. Navighează în `focus_app`.
+2. Rulează comanda pentru a genera pachetul MSIX:
+   ```bash
+   flutter pub run msix:create
+   ```
+3. Instalează fișierul generat (îl vei găsi în `focus_app/build/windows/x64/runner/Release`).
+
+**Varianta de Dezvoltare:**
+1. Navighează în `focus_app`.
+2. Rulează comanda:
+   ```bash
+   flutter run -d windows
+   ```
+
 ## 📂 Project Structure
 
 The repository is organized into two main components:

@@ -199,7 +199,37 @@ class _LoginPageState extends State<LoginPage> {
                          _isLoading = false;
                       });
                       if (error == null) {
-                         widget.onLoginSuccess();
+                         // Show success popup
+                         if (context.mounted) {
+                           showDialog(
+                             context: context,
+                             barrierDismissible: false,
+                             builder: (ctx) => AlertDialog(
+                               backgroundColor: const Color(0xFF1E1E1E),
+                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                               title: Row(
+                                 children: [
+                                   Icon(Icons.check_circle, color: Colors.greenAccent),
+                                   SizedBox(width: 12),
+                                   Text('Succes!', style: TextStyle(color: Colors.white)),
+                                 ],
+                               ),
+                               content: Text(
+                                 'Te-ai autentificat cu succes folosind Google. Bine ai venit!',
+                                 style: TextStyle(color: Colors.white70),
+                               ),
+                               actions: [
+                                 TextButton(
+                                   onPressed: () {
+                                     Navigator.pop(ctx);
+                                     widget.onLoginSuccess();
+                                   },
+                                   child: Text('Incepe', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                                 ),
+                               ],
+                             ),
+                           );
+                         }
                       } else {
                         setState(() {
                           _errorMessage = error;

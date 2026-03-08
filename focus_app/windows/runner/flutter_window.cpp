@@ -3,7 +3,50 @@
 #include "icon_utils.h"
 
 #include <optional>
+#include <algorithm>
+#include <cctype>
+#include <set>
+#include <shlobj.h>
+#include <shlguid.h>
+#include <objbase.h>
+#include <filesystem>
 #include <flutter/encodable_value.h>
+
+namespace fs = std::filesystem;
+
+// Helper to resolve .lnk files
+std::string ResolveShortcut(const std::wstring& shortcutPath) {
+    IShellLinkW* psl;
+    std::string result = "";
+    
+    // Initialize COM if not already
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+
+    HRESULT hres = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID*)&psl);
+    if (SUCCEEDED(hres)) {
+        IPersistFile* ppf;
+        hres = psl->QueryInterface(IID_IPersistFile, (LPVOID*)&ppf);
+        if (SUCCEEDED(hres)) {
+            hres = ppf->Load(shortcutPath.c_str(), STGM_READ);
+            if (SUCCEEDED(hres)) {
+                wchar_t target[MAX_PATH];
+                hres = psl->GetPath(target, MAX_PATH, NULL, SLGP_RAWPATH);
+                if (SUCCEEDED(hres)) {
+                    // Convert wstring to utf8
+                    int size = WideCharToMultiByte(CP_UTF8, 0, target, -1, NULL, 0, NULL, NULL);
+                    if (size > 0) {
+                        std::string s(size - 1, 0);
+                        WideCharToMultiByte(CP_UTF8, 0, target, -1, &s[0], size, NULL, NULL);
+                        result = s;
+                    }
+                }
+            }
+            ppf->Release();
+        }
+        psl->Release();
+    }
+    return result;
+}
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -13,6 +56,14 @@ struct BlockedEvent {
   HWND hwnd;
 };
 const UINT WM_PROCESS_BLOCKED = WM_APP + 1;
+
+static std::string ToLowerCopy(const std::string& s) {
+  std::string r = s;
+  std::transform(r.begin(), r.end(), r.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
+  return r;
+}
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -96,79 +147,49 @@ bool FlutterWindow::OnCreate() {
           if (overlay_window_) overlay_window_->Hide();
           result->Success();
         } else if (method == "getInstalledApps") {
-          // enumerate uninstall registry keys (Unicode API + UTF-8 conversion)
-          auto WideToUtf8 = [](const std::wstring& w) -> std::string {
-            if (w.empty()) return {};
-            int size = WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(), NULL, 0, NULL, NULL);
-            if (size <= 0) return {};
-            std::string s(size, 0);
-            WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(), &s[0], size, NULL, NULL);
-            return s;
-          };
-
           flutter::EncodableList out;
-          HKEY roots[2] = {HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER};
-          const wchar_t* paths[] = {L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-                                    L"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"};
-          for (auto rk : roots) {
-            for (auto path : paths) {
-              HKEY h;
-              if (RegOpenKeyExW(rk, path, 0, KEY_READ, &h) == ERROR_SUCCESS) {
-                wchar_t sub[256];
-                DWORD idx = 0;
-                DWORD subSize = (DWORD)(sizeof(sub)/sizeof(wchar_t));
-                while (RegEnumKeyExW(h, idx++, sub, &subSize, NULL, NULL, NULL, NULL) == ERROR_SUCCESS) {
-                  HKEY s;
-                  if (RegOpenKeyExW(h, sub, 0, KEY_READ, &s) == ERROR_SUCCESS) {
-                    wchar_t namew[512] = {0};
-                    DWORD size = sizeof(namew);
-                    if (RegQueryValueExW(s, L"DisplayName", NULL, NULL, (LPBYTE)namew, &size) == ERROR_SUCCESS && namew[0]) {
-                      wchar_t iconw[512] = {0};
-                      size = sizeof(iconw);
-                      RegQueryValueExW(s, L"DisplayIcon", NULL, NULL, (LPBYTE)iconw, &size);
-                      // try to extract executable name from DisplayIcon
-                      std::string exeName;
-                      std::string iconStrUtf;
-                      if (iconw[0]) {
-                        iconStrUtf = WideToUtf8(std::wstring(iconw));
-                        auto comma = iconStrUtf.find(',');
-                        if (comma != std::string::npos) iconStrUtf = iconStrUtf.substr(0, comma);
-                        if (!iconStrUtf.empty() && (iconStrUtf.front() == '"' || iconStrUtf.front() == '\'')) iconStrUtf = iconStrUtf.substr(1);
-                        if (!iconStrUtf.empty() && (iconStrUtf.back() == '"' || iconStrUtf.back() == '\'')) iconStrUtf.pop_back();
-                        auto pos = iconStrUtf.find_last_of("\\/");
-                        exeName = (pos == std::string::npos) ? iconStrUtf : iconStrUtf.substr(pos + 1);
-                      }
-                      
-                      // Fix: If the extracted exeName is just an .ico file, it's not the process name.
-                      if (exeName.size() >= 4 && exeName.substr(exeName.size() - 4) == ".ico") {
-                        exeName = ""; 
-                      }
+          std::vector<std::wstring> startMenuPaths;
+          
+          // 1. System-wide Start Menu
+          wchar_t commonPath[MAX_PATH];
+          if (SHGetSpecialFolderPathW(NULL, commonPath, CSIDL_COMMON_PROGRAMS, FALSE)) {
+            startMenuPaths.push_back(commonPath);
+          }
+          // 2. User-specific Start Menu
+          wchar_t userPath[MAX_PATH];
+          if (SHGetSpecialFolderPathW(NULL, userPath, CSIDL_PROGRAMS, FALSE)) {
+            startMenuPaths.push_back(userPath);
+          }
 
-                      flutter::EncodableMap m;
-                      std::string nameUtf = WideToUtf8(std::wstring(namew));
-                      m[flutter::EncodableValue("name")] = flutter::EncodableValue(nameUtf);
-                      m[flutter::EncodableValue("id")] = flutter::EncodableValue(nameUtf);
-                      m[flutter::EncodableValue("exe")] = flutter::EncodableValue(exeName);
-                      m[flutter::EncodableValue("icon")] = flutter::EncodableValue(iconStrUtf);
-                      
-                      // Extract icon
-                      std::string iconPath = exeName.empty() ? iconStrUtf : exeName;
-                      // if exeName is just filename, prefer full path from iconStrUtf if valid
-                      if (iconStrUtf.find(":\\") != std::string::npos) iconPath = iconStrUtf;
-                      
-                      std::string base64Icon = ExtractIconAsPngBase64(iconPath);
-                      m[flutter::EncodableValue("iconData")] = flutter::EncodableValue(base64Icon);
+          std::set<std::string> seenExes;
 
-                      out.push_back(m);
-                    }
-                    RegCloseKey(s);
-                  }
-                  // reset subSize for next iteration
-                  subSize = (DWORD)(sizeof(sub)/sizeof(wchar_t));
+          for (const auto& basePath : startMenuPaths) {
+            try {
+              for (const auto& entry : fs::recursive_directory_iterator(basePath)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".lnk") {
+                  std::string targetExe = ResolveShortcut(entry.path().wstring());
+                  if (targetExe.empty() || targetExe.find(".exe") == std::string::npos) continue;
+
+                  std::string exeName = fs::path(targetExe).filename().string();
+                  std::string displayName = entry.path().stem().string();
+
+                  // Avoid duplicates
+                  if (seenExes.count(ToLowerCopy(exeName))) continue;
+                  seenExes.insert(ToLowerCopy(exeName));
+
+                  flutter::EncodableMap m;
+                  m[flutter::EncodableValue("name")] = flutter::EncodableValue(displayName);
+                  m[flutter::EncodableValue("id")] = flutter::EncodableValue(displayName);
+                  m[flutter::EncodableValue("exe")] = flutter::EncodableValue(exeName);
+                  
+                  // Extract icon from the target exe
+                  std::string base64Icon = ExtractIconAsPngBase64(targetExe);
+                  m[flutter::EncodableValue("iconData")] = flutter::EncodableValue(base64Icon);
+
+                  out.push_back(m);
                 }
-                RegCloseKey(h);
               }
-            }
+            } catch (...) {}
           }
           result->Success(flutter::EncodableValue(out));
         } else if (method == "setBlockList") {
@@ -183,6 +204,12 @@ bool FlutterWindow::OnCreate() {
             }
           }
           process_monitor_->SetBlockList(list);
+          result->Success();
+        } else if (method == "forceToForeground") {
+          HWND hwnd = GetHandle();
+          if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+          SetForegroundWindow(hwnd);
+          SetFocus(hwnd);
           result->Success();
         } else if (method == "isRunning") {
           result->Success(flutter::EncodableValue(process_monitor_->IsRunning()));
@@ -235,7 +262,6 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
-  // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =
         flutter_controller_->HandleTopLevelWindowProc(hwnd, message, wparam,

@@ -1,0 +1,106 @@
+\documentclass[12pt,a4paper,oneside]{report}
+
+% --- PACHETE ESENȚIALE ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[romanian]{babel}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{a4paper, top=2.5cm, bottom=2.5cm, left=3cm, right=2.5cm}
+\usepackage{times} % Font standard academic
+\usepackage{setspace}
+\onehalfspacing % Spațiere la 1.5 rânduri
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{titlesec}
+
+% --- CONFIGURARE COD SURSĂ (pentru Dart/JS) ---
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\lstset{
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=	iny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=	tfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+% --- DATELE LUCRIĂRII ---
+	itle{Sistem distribuit pentru managementul productivității și controlul distracțiilor digitale}
+\author{Numele Tău}
+\date{Iunie 2026}
+
+\begin{document}
+
+% --- PAGINA DE TITLU (Simplificată - va trebui adaptată la formatul UPT) ---
+\begin{titlepage}
+    \begin{center}
+        \large Universitatea Politehnica Timișoara 
+        Facultatea de Automatică și Calculatoare 
+        Specializarea [Numele Specializării Tale - ex: CTI / IS] 
+        \vfill
+        \Huge 	extbf{LUCRARE DE LICENȚĂ} 
+        \vspace{1cm}
+        \Large 	extbf{Sistem distribuit pentru managementul productivității și controlul distracțiilor digitale} 
+        \vfill
+        \begin{flushleft}
+            \large 	extbf{Coordonator științific:} 
+            [Titlu și Nume Coordonator]
+        \end{flushleft}
+        \begin{flushright}
+            \large 	extbf{Absolvent:} 
+            [Numele Tău]
+        \end{flushright}
+        \vfill
+        \large Timișoara 
+        2026
+    \end{center}
+\end{titlepage}
+
+	ableofcontents
+
+\chapter{Introducere}
+\section{Motivația proiectului}
+\section{Obiectivele lucrării}
+
+\chapter{Analiza domeniului și tehnologii utilizate}
+\section{Stadiul actual al aplicațiilor de productivitate}
+\section{Tehnologii de dezvoltare cross-platform: Flutter}
+\section{Ecosistemul Google Cloud și Firebase Realtime Database}
+\section{Extensii de browser și Google Calendar API}
+
+\chapter{Proiectarea și Arhitectura Sistemului}
+\section{Arhitectura de ansamblu a sistemului distribuit}
+\section{Modelarea datelor în Firebase}
+\section{Mecanisme de sincronizare între dispozitive (Presence System)}
+
+\chapter{Implementarea Soluției}
+\section{Aplicația Flutter: Managementul proceselor pe Android și Windows}
+\section{Extensia de browser: Filtrarea traficului web și sincronizarea sesiunilor}
+\section{Integrarea cu Google Calendar pentru automatizarea focusului}
+
+\chapter{Testare și Validare}
+\section{Cazuri de utilizare și testarea funcționalității}
+\section{Analiza performanței și consumului de resurse}
+
+\chapter{Concluzii și direcții viitoare}
+
+\bibliographystyle{plain}
+\begin{thebibliography}{99}
+\bibitem{flutter} Flutter Documentation, https://docs.flutter.dev/
+\bibitem{firebase} Firebase Realtime Database, https://firebase.google.com/docs/database
+\end{thebibliography}
+
+\end{document}

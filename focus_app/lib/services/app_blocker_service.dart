@@ -6,6 +6,7 @@ import 'package:device_apps/device_apps.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'background_service.dart';
+import '../auth_service.dart';
 
 class AppInfo {
   final String id;
@@ -62,6 +63,14 @@ class AppBlockerService {
   static Future<void> setBlockList(List<String> ids) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('blocked_apps', ids);
+    
+    // Sync to Firebase for extension/web
+    try {
+      final authService = AuthService();
+      await authService.updateBlockedApps(ids);
+    } catch (e) {
+      debugPrint("Firebase sync error: $e");
+    }
     
     if (Platform.isWindows) {
       await WindowsProcessMonitor.setBlockList(ids);

@@ -65,6 +65,12 @@ class WindowsProcessMonitor {
     await _channel.invokeMethod('stopMonitor');
   }
 
+  static Future<void> forceToForeground() async {
+    try {
+      await _channel.invokeMethod('forceToForeground');
+    } catch (_) {}
+  }
+
   static Future<bool> isRunning() async {
     try {
       final res = await _channel.invokeMethod('isRunning');

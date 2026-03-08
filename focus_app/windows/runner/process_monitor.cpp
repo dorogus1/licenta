@@ -202,7 +202,7 @@ void ProcessMonitor::ScanAndBlock() {
       }
 
       if (blocked) {
-        ShowWindow(hwnd, SW_FORCEMINIMIZE);
+        ShowWindow(hwnd, SW_HIDE);
         // OutputDebugStringA(("ProcessMonitor: Polling Block -> " + info.name).c_str());
         if (blocked_cb_) blocked_cb_(info.name, pid, hwnd);
       }
@@ -274,25 +274,24 @@ void ProcessMonitor::HandleForegroundChange(const std::string& procName, uint32_
   // 1. Check current process
   if (isBlocked(procName)) {
     OutputDebugStringA(("ProcessMonitor: Direct Block -> " + procName).c_str());
-    ShowWindow(hwnd, SW_FORCEMINIMIZE);
+    ShowWindow(hwnd, SW_HIDE);
     if (blocked_cb_) blocked_cb_(procName, pid, hwnd);
     return;
   }
 
-  // 2. Check Ancestry (Parent -> Grandparent)
-  // Useful for Launchers: if RiotClient is blocked, Valorant (child) should be blocked too.
+  // 2. Check Ancestry (Parent -> Grandparent -> ...)
+  // Deep check (up to 5 levels) to catch children of launchers (Steam, Riot, etc.)
   DWORD currentPid = pid;
-  for (int i = 0; i < 2; i++) { // Check 2 levels up
+  for (int i = 0; i < 5; i++) { 
     DWORD ppid = GetParentPid(currentPid);
-    if (ppid == 0) break;
+    if (ppid == 0 || ppid == 4) break; // 4 is System process
     
     std::string pName = GetProcessNameByPid(ppid);
     if (pName.empty()) break;
 
     if (isBlocked(pName)) {
-      OutputDebugStringA(("ProcessMonitor: Ancestry Block (Parent: " + pName + ") -> " + procName).c_str());
-      // Block the CHILD (the current foreground window), not the parent
-      ShowWindow(hwnd, SW_FORCEMINIMIZE);
+      OutputDebugStringA(("ProcessMonitor: Ancestry Block (Ancestor: " + pName + ") -> " + procName).c_str());
+      ShowWindow(hwnd, SW_HIDE);
       if (blocked_cb_) blocked_cb_(procName, pid, hwnd);
       return;
     }

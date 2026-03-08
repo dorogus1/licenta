@@ -37,19 +37,22 @@ html, body {
   color: var(--text-color);
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden; /* Main window doesn't scroll, container does */
   transition: background-color 0.3s, color 0.3s;
 }
 
 .container {
   padding: 15px;
   padding-bottom: 70px;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto; /* Scrollable content */
 }
 
 /* PAGINI */
 .page {
   display: none;
+  min-height: 100%;
 }
 .page.active {
   display: block;
@@ -272,14 +275,48 @@ body.dark-mode input[type="time"]::-webkit-calendar-picker-indicator {
 /* Calendar List Item Styling */
 #calendarList li {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    padding: 10px;
+    padding: 12px;
     margin-bottom: 8px;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 10px;
     color: var(--text-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.event-time-badge {
+    background: var(--primary-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-right: 12px;
+}
+
+.event-info {
+    flex: 1;
+}
+
+.event-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: block;
+}
+
+.calendar-nav button {
+    cursor: pointer;
+    background: #333;
+    border: none;
+    color: white;
+    font-size: 1.1rem;
+    line-height: 1;
+    transition: background 0.2s;
+}
+.calendar-nav button:hover {
+    background: #444;
 }
 
 /* APPS LIST */

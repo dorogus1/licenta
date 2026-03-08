@@ -613,14 +613,13 @@ async function loadEventsForDate() {
         data.items.forEach(evt => {
             const start = evt.start.dateTime || evt.start.date;
             const dateObj = new Date(start);
-            const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            // const dayStr = dateObj.toLocaleDateString([], {month: 'short', day: 'numeric'}); // No longer needed as we show day at top
+            const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
 
             const li = document.createElement('li');
             li.innerHTML = `
-                <div style="flex:1">
-                    <div style="font-weight:600; font-size:14px;">${evt.summary || '(No Title)'}</div>
-                    <div style="font-size:12px; color:#666;">${timeStr}</div>
+                <div class="event-time-badge">${timeStr}</div>
+                <div class="event-info">
+                    <span class="event-title">${evt.summary || '(No Title)'}</span>
                 </div>
             `;
             calendarList.appendChild(li);
@@ -763,11 +762,13 @@ if (btnConnectCalendar) {
 }
 
 // Timer logic
-function updateTimerDisplay() {
+function updateTimerDisplay(save = true) {
     const mins = Math.floor(timeLeft / 60);
     const secs = timeLeft % 60;
     timerDisplay.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    chrome.storage.local.set({ timerTimeLeft: timeLeft });
+    if (save) {
+        chrome.storage.local.set({ timerTimeLeft: timeLeft });
+    }
 }
 
 function syncToFirebase(active) {
@@ -794,27 +795,35 @@ function syncToFirebase(active) {
 function startTimer(restoring = false, fromSync = false) {
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
+        // Just update UI every second based on timeLeft
+        // The background script is the source of truth for timeLeft now, 
+        // but for smooth UI we can decrement locally or wait for storage events.
+        // Let's decrement locally for smoothness.
         if (timeLeft > 0) {
             timeLeft--;
-            updateTimerDisplay();
-            chrome.storage.local.set({ timerTimeLeft: timeLeft, timerRunning: true, timerLastUpdate: Date.now(), focusActive: true });
+            updateTimerDisplay(false); // don't save to storage here, background does it
         } else {
-            stopTimer();
+            stopTimer(true);
         }
     }, 1000);
     timerRunning = true;
     playPauseBtn.innerHTML = '&#10073;&#10073;'; // Pause icon
-    if (!restoring) {
-        chrome.storage.local.set({ timerRunning: true, timerLastUpdate: Date.now(), focusActive: true });
-        if (!fromSync) syncToFirebase(true);
+    
+    if (!restoring && !fromSync) {
+        // This is a manual start from popup
+        syncToFirebase(true);
     }
 }
 function stopTimer(fromSync = false) {
-    clearInterval(timerInterval);
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
     timerRunning = false;
     playPauseBtn.innerHTML = '&#9654;'; // Play icon
-    chrome.storage.local.set({ timerRunning: false, focusActive: false });
-    if (!fromSync) syncToFirebase(false);
+    
+    if (!fromSync) {
+        // This is a manual stop from popup
+        syncToFirebase(false);
+    }
 }
     
 if (playPauseBtn) {

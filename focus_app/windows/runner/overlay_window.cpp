@@ -18,26 +18,28 @@ void OverlayWindow::ShowOver(HWND target, const std::string& appName) {
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     RegisterClassA(&wc);
 
-    hwnd_ = CreateWindowExA(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED,
+    // Create a centered window
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    int w = 500;
+    int h = 300;
+    int x = (screenWidth - w) / 2;
+    int y = (screenHeight - h) / 2;
+
+    hwnd_ = CreateWindowExA(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
                              "FocusAppOverlay", "",
                              WS_POPUP,
-                             CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+                             x, y, w, h,
                              NULL, NULL, GetModuleHandle(NULL), this);
 
-    CreateWindowA("STATIC", appName_.c_str(), WS_CHILD | WS_VISIBLE | SS_CENTER,
-                  10, 10, 300, 24, hwnd_, NULL, GetModuleHandle(NULL), NULL);
-    CreateWindowA("BUTTON", "Inchide aplicatia", WS_CHILD | WS_VISIBLE,
-                  10, 44, 160, 32, hwnd_, (HMENU)1001, GetModuleHandle(NULL), NULL);
+    // Subtle X button in top-left
+    CreateWindowA("BUTTON", "X", WS_CHILD | WS_VISIBLE | BS_FLAT,
+                  10, 10, 30, 30, hwnd_, (HMENU)1001, GetModuleHandle(NULL), NULL);
 
-    SetLayeredWindowAttributes(hwnd_, 0, 255, LWA_ALPHA);
-  } else {
-    HWND staticText = FindWindowExA(hwnd_, NULL, "STATIC", NULL);
-    if (staticText) SetWindowTextA(staticText, appName.c_str());
+    SetLayeredWindowAttributes(hwnd_, 0, 240, LWA_ALPHA);
   }
 
-
-  SetTimer(hwnd_, 1, 20, NULL);
-  ShowWindow(hwnd_, SW_SHOWNA);
+  ShowWindow(hwnd_, SW_SHOW);
   UpdateWindow(hwnd_);
 }
 
@@ -62,94 +64,63 @@ LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
   
   auto inst = (OverlayWindow*)GetWindowLongPtrA(hwnd, GWLP_USERDATA);
 
-  if (uMsg == WM_TIMER && wParam == 1 && inst) {
-    if (!IsWindow(inst->target_)) {
-      inst->Hide();
-      return 0;
-    }
-    // Hide if target is minimized (iconic)
-    if (IsIconic(inst->target_)) {
-      inst->Hide();
-      return 0;
-    }
-
-    // Check if we should hide because user Alt-Tabbed away
-    HWND fg = GetForegroundWindow();
-    if (fg != inst->target_ && fg != hwnd) {
-      inst->Hide();
-      return 0;
-    }
-
-    // Follow the target window size and position
-    RECT r;
-    GetWindowRect(inst->target_, &r);
-    SetWindowPos(hwnd, HWND_TOPMOST, r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_NOACTIVATE);
-    
-    // Reposition child controls (Button) to be centered
-    RECT client;
-    GetClientRect(hwnd, &client);
-    int width = client.right - client.left;
-    int height = client.bottom - client.top;
-    
-    // Hide original static text in favor of custom paint, but keep button
-    HWND btn = FindWindowExA(hwnd, NULL, "BUTTON", NULL);
-    if (btn) {
-       SetWindowPos(btn, NULL, (width - 160)/2, height/2 + 40, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-    }
-    
-    return 0;
-  }
-
   if (uMsg == WM_COMMAND) {
     if (LOWORD(wParam) == 1001) {
-      // find parent class instance and attempt to close target
+      // subtle X button clicked
       if (inst && inst->target_) {
-        // try WM_CLOSE
-        PostMessage(inst->target_, WM_CLOSE, 0, 0);
-        // if still visible after short delay, try terminate
-        Sleep(200);
-        if (IsWindow(inst->target_)) {
-          DWORD pid = 0;
-          GetWindowThreadProcessId(inst->target_, &pid);
-          HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
-          if (h) {
-            TerminateProcess(h, 1);
-            CloseHandle(h);
-          }
+        DWORD pid = 0;
+        GetWindowThreadProcessId(inst->target_, &pid);
+        HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+        if (h) {
+          TerminateProcess(h, 1);
+          CloseHandle(h);
         }
+        inst->Hide();
       }
       return 0;
     }
   }
+
   if (uMsg == WM_PAINT) {
     PAINTSTRUCT ps;
     HDC dc = BeginPaint(hwnd, &ps);
     RECT r;
     GetClientRect(hwnd, &r);
     
-    // Solid Black Background
-    HBRUSH brush = CreateSolidBrush(RGB(0, 0, 0));
+    // Smooth Dark Background
+    HBRUSH brush = CreateSolidBrush(RGB(30, 30, 30));
     FillRect(dc, &r, brush);
     DeleteObject(brush);
     
     // White Text
-    SetTextColor(dc, RGB(255, 255, 255));
+    SetTextColor(dc, RGB(240, 240, 240));
     SetBkMode(dc, TRANSPARENT);
     
-    // Create a larger font for impact
-    HFONT hFont = CreateFontA(32, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 
-                              OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
-                              DEFAULT_PITCH | FF_SWISS, "Segoe UI");
-    HFONT hOldFont = (HFONT)SelectObject(dc, hFont);
+    // Title Font
+    HFONT hFontTitle = CreateFontA(28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 
+                                  OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
+                                  DEFAULT_PITCH | FF_SWISS, "Segoe UI");
+    HFONT hOldFont = (HFONT)SelectObject(dc, hFontTitle);
     
-    const char* msg = "Aplicatia este blocata!\nTreci inapoi la treaba.";
+    RECT titleRect = r;
+    titleRect.top += 60;
+    DrawTextA(dc, "Timpul tau este pretios!", -1, &titleRect, DT_CENTER | DT_TOP | DT_SINGLELINE | DT_NOCLIP);
+    
+    // Subtitle Font
+    HFONT hFontSub = CreateFontA(20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 
+                                 OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
+                                 DEFAULT_PITCH | FF_SWISS, "Segoe UI");
+    SelectObject(dc, hFontSub);
+    
     RECT textRect = r;
-    // Move text up a bit so it doesn't overlap button
-    textRect.bottom -= 60; 
-    DrawTextA(dc, msg, -1, &textRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
+    textRect.top += 120;
+    textRect.left += 40;
+    textRect.right -= 40;
+    DrawTextA(dc, "Aceasta aplicatie a fost blocata pentru a te ajuta sa ramai productiv si concentrat pe ceea ce conteaza cu adevarat.", -1, &textRect, DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
     
     SelectObject(dc, hOldFont);
-    DeleteObject(hFont);
+    DeleteObject(hFontTitle);
+    DeleteObject(hFontSub);
     
     EndPaint(hwnd, &ps);
     return 0;

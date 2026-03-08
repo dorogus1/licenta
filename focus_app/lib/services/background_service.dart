@@ -7,6 +7,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:usage_stats/usage_stats.dart';
 import 'package:device_apps/device_apps.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 Future<void> initializeBackgroundService() async {
   final service = FlutterBackgroundService();
@@ -93,6 +95,79 @@ void onStart(ServiceInstance service) async {
   
   service.on('stopService').listen((event) {
     service.stopSelf();
+  });
+
+  // Calendar Check Loop
+  Timer.periodic(const Duration(minutes: 1), (timer) async {
+    final token = prefs.getString('google_access_token');
+    if (token == null) return;
+
+    final now = DateTime.now().toUtc();
+    // Check events that are around current time
+    final timeMin = now.subtract(const Duration(hours: 1)).toIso8601String();
+    final timeMax = now.add(const Duration(hours: 1)).toIso8601String();
+
+    final url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=$timeMin&timeMax=$timeMax&singleEvents=true&orderBy=startTime';
+
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final events = data['items'] ?? [];
+        bool anyActive = false;
+        String? activeTitle;
+
+        for (var event in events) {
+          final startStr = event['start']['dateTime'] ?? event['start']['date'];
+          final endStr = event['end']['dateTime'] ?? event['end']['date'];
+          final start = DateTime.parse(startStr).toUtc();
+          final end = DateTime.parse(endStr).toUtc();
+
+          if (now.isAfter(start) && now.isBefore(end)) {
+            anyActive = true;
+            activeTitle = event['summary'];
+            break;
+          }
+        }
+
+        if (anyActive && !isFocusing) {
+          isFocusing = true;
+          if (service is AndroidServiceInstance) {
+            service.setForegroundNotificationInfo(
+              title: "Focus Mode On (Calendar)",
+              content: "Active event: $activeTitle",
+            );
+          }
+          debugPrint("Background Service: Focus started by Calendar event: $activeTitle");
+
+          // Sync to Firebase
+          final userId = prefs.getString('auth_user_id');
+          final authToken = prefs.getString('auth_token');
+          if (userId != null && authToken != null) {
+            final url = 'https://focus-shild-default-rtdb.europe-west1.firebasedatabase.app/users/$userId/focus_session.json?auth=$authToken';
+            http.put(
+              Uri.parse(url),
+              body: json.encode({
+                'isActive': true,
+                'updatedBy': 'mobile_calendar',
+                'lastUpdatedAt': DateTime.now().millisecondsSinceEpoch,
+                'eventTitle': activeTitle
+              }),
+            ).catchError((e) => debugPrint("Firebase sync error: $e"));
+          }
+        } else if (!anyActive && isFocusing) {
+            // Optional: Auto-stop focus when event ends? 
+            // User might want to keep it on, but if they want "crazy" sync, let's auto-start at least.
+            // For now, let's only auto-start.
+        }
+      }
+    } catch (e) {
+      debugPrint("Calendar background check error: $e");
+    }
   });
 
   // Monitoring Loop

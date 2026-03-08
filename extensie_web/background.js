@@ -20,6 +20,42 @@ let devicesUnsub = null;
 let sessionUnsub = null; // New listener for session
 let currentUserId = null;
 
+// --- TIMER MANAGEMENT ---
+let timerInterval = null;
+
+function startBackgroundTimer(durationSeconds) {
+    if (timerInterval) clearInterval(timerInterval);
+    
+    let timeLeft = durationSeconds;
+    chrome.storage.local.set({ 
+        timerRunning: true, 
+        timerTimeLeft: timeLeft, 
+        timerLastUpdate: Date.now(),
+        focusActive: true 
+    });
+
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+            stopBackgroundTimer();
+        } else {
+            chrome.storage.local.set({ 
+                timerTimeLeft: timeLeft, 
+                timerLastUpdate: Date.now() 
+            });
+        }
+    }, 1000);
+}
+
+function stopBackgroundTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+    chrome.storage.local.set({ 
+        timerRunning: false, 
+        focusActive: false 
+    });
+}
+
 function setupPresence(user) {
     if (!user) return;
     if (presenceUnsub && currentUserId === user.uid) return; 
@@ -71,7 +107,74 @@ function setupPresence(user) {
             sessionUnsub = onValue(sessionRef, (snapshot) => {
                 const session = snapshot.val();
                 console.log('[background] Syncing session to storage:', session);
-                chrome.storage.local.set({ cachedSession: session || null });
+                
+                chrome.storage.local.get(['focus_deviceId'], (localData) => {
+                    const myDeviceId = localData.focus_deviceId;
+                    const updatedByMe = session && (session.updatedBy === 'extension' || session.updatedBy === myDeviceId || session.updatedBy === 'extension_calendar');
+
+                    if (session && session.isActive) {
+                        const now = Date.now();
+                        const endTime = session.endTime || (now + 25 * 60 * 1000);
+                        const remaining = Math.floor((endTime - now) / 1000);
+                        
+                        if (remaining > 0) {
+                            // If it's not updated by me, we MUST sync our local timer to it
+                            if (!updatedByMe) {
+                                console.log('[background] Session started by other device. Syncing timer.');
+                                startBackgroundTimer(remaining);
+                            }
+                        }
+                    } else {
+                        // If session is NOT active and NOT updated by me, stop local timer
+                        if (!updatedByMe && timerInterval) {
+                            console.log('[background] Session stopped by other device. Stopping timer.');
+                            stopBackgroundTimer();
+                        }
+                    }
+
+                    chrome.storage.local.set({ 
+                        cachedSession: session || null,
+                        focusActive: session ? (session.isActive || false) : false
+                    });
+                });
+            });
+
+            // 4. Sync Blocked Apps from Mobile (NEW)
+            const blockedAppsRef = ref(db, `users/${user.uid}/blocked_apps`);
+            onValue(blockedAppsRef, (snapshot) => {
+                const packages = snapshot.val() || [];
+                console.log('[background] Blocked apps from mobile:', packages);
+                
+                const appToSiteMap = {
+                    'com.instagram.android': 'instagram.com',
+                    'com.facebook.katana': 'facebook.com',
+                    'com.facebook.orca': 'messenger.com',
+                    'com.zhiliaoapp.musically': 'tiktok.com',
+                    'com.google.android.youtube': 'youtube.com',
+                    'com.twitter.android': 'twitter.com',
+                    'com.twitter.android.x': 'x.com',
+                    'com.whatsapp': 'web.whatsapp.com',
+                    'com.snapchat.android': 'snapchat.com',
+                    'com.reddit.frontpage': 'reddit.com',
+                    'com.netflix.mediaclient': 'netflix.com',
+                    'com.spotify.music': 'spotify.com',
+                    'com.linkedin.android': 'linkedin.com',
+                    'com.pinterest': 'pinterest.com',
+                    'com.discord': 'discord.com',
+                    'com.twitch.android': 'twitch.tv',
+                    'com.amazon.mShop.android.shopping': 'amazon.com',
+                    'com.amazon.mobile.shopping.anaconda': 'amazon.com',
+                    'com.ebay.mobile': 'ebay.com',
+                    'com.hbo.hbonow': 'max.com',
+                    'com.disney.disneyplus': 'disneyplus.com'
+                };
+
+                const mappedSites = packages
+                    .map(pkg => appToSiteMap[pkg])
+                    .filter(site => site !== undefined);
+                
+                console.log('[background] Mapped blocked sites:', mappedSites);
+                chrome.storage.local.set({ blockedApps: mappedSites });
             });
 
         } catch (err) {
@@ -114,6 +217,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
              try {
                 await set(sessionRef, data);
                 console.log('[background] Session updated successfully.');
+                
+                // Also update local background timer state immediately
+                if (request.data.isActive) {
+                    const now = Date.now();
+                    const remaining = Math.floor(((request.data.endTime || (now + 25*60*1000)) - now) / 1000);
+                    startBackgroundTimer(remaining);
+                } else {
+                    stopBackgroundTimer();
+                }
              } catch (err) {
                 console.error('[background] Session update failed:', err);
              }
@@ -330,6 +442,18 @@ async function checkCalendarEvents() {
                             timerLastUpdate: Date.now(),
                             lastEventId: eventId
                         });
+
+                        // Sync to Firebase
+                        if (currentUserId) {
+                            const sessionRef = ref(db, `users/${currentUserId}/focus_session`);
+                            set(sessionRef, {
+                                isActive: true,
+                                endTime: Date.now() + (remainingSeconds * 1000),
+                                updatedBy: 'extension_calendar',
+                                lastUpdatedAt: serverTimestamp(),
+                                eventTitle: currentEvent.summary
+                            });
+                        }
 
                         chrome.notifications.create({
                             type: 'basic',

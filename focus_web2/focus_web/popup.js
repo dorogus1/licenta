@@ -1,9 +1,9 @@
-// --- Apps (Blocked URLs) logic ---
+
 const appUrlInput = document.getElementById('appUrlInput');
 const addAppBtn = document.getElementById('addAppBtn');
 const appsList = document.getElementById('appsList');
 
-// Load saved apps on open and manage empty state
+
 const appsEmpty = document.getElementById('appsEmpty');
 function refreshEmptyState() {
     const has = appsList.children.length > 0;
@@ -16,10 +16,10 @@ chrome.storage.local.get(['blockedApps'], (data) => {
     refreshEmptyState();
 });
 
-// Add app on click or Enter
+
 addAppBtn && addAppBtn.addEventListener('click', () => {
     let raw = appUrlInput.value.trim().toLowerCase();
-    // sanitize: remove protocol, path, and leading www., and trim trailing dots
+
     raw = raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '').replace(/\.+$/, '');
     if (!raw) return;
 
@@ -37,7 +37,7 @@ addAppBtn && addAppBtn.addEventListener('click', () => {
         url = `${raw}.com`;
     }
 
-    // final cleanup
+
     url = url.replace(/\.+$/, '');
 
     if (url) {
