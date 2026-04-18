@@ -1,18 +1,20 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
 enum Recurrence { none, daily, weekly }
 
 class TodoTask {
   final String id;
-  final String title;
-  final DateTime startTime;
-  final DateTime endTime;
+  String title;
+  DateTime startTime;
+  DateTime endTime;
   bool isCompleted;
   Recurrence recurrence;
   String? calendarEventId;
@@ -59,31 +61,75 @@ class TodoPage extends StatefulWidget {
 class _TodoPageState extends State<TodoPage> {
   List<TodoTask> _tasks = [];
   DateTime _selectedDate = DateTime.now();
-  final ScrollController _timelineScrollController = ScrollController();
+  
+  final ScrollController _verticalScrollController = ScrollController();
+  final ScrollController _headerHorizontalController = ScrollController();
+  final ScrollController _gridHorizontalController = ScrollController();
+  
   Timer? _nowTimer;
+  bool _isSyncing = false;
+  bool _isWeekView = false;
+
+  // Check if current platform is desktop
+  bool get _isDesktop => !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
-    // Scroll to current hour
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_timelineScrollController.hasClients) {
-        double scrollOffset = DateTime.now().hour * 80.0;
-        _timelineScrollController.animateTo(scrollOffset, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+    _checkAndPerformAutoSync();
+    
+    _gridHorizontalController.addListener(() {
+      if (_headerHorizontalController.hasClients && 
+          _headerHorizontalController.offset != _gridHorizontalController.offset) {
+        _headerHorizontalController.jumpTo(_gridHorizontalController.offset);
+      }
+    });
+    _headerHorizontalController.addListener(() {
+      if (_gridHorizontalController.hasClients && 
+          _gridHorizontalController.offset != _headerHorizontalController.offset) {
+        _gridHorizontalController.jumpTo(_headerHorizontalController.offset);
       }
     });
 
-    // Refresh for current time line every minute
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_verticalScrollController.hasClients) {
+        double scrollOffset = DateTime.now().hour * 80.0;
+        _verticalScrollController.animateTo(scrollOffset, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+      }
+    });
+
     _nowTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       if (mounted) setState(() {});
     });
   }
 
+  Future<void> _checkAndPerformAutoSync() async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    final String lastSyncMonth = prefs.getString('last_google_sync_month') ?? '';
+    final String currentMonthStr = '${now.year}-${now.month}';
+
+    if (lastSyncMonth != currentMonthStr) {
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      
+      Future.delayed(const Duration(seconds: 2), () async {
+        final token = await widget.authService.getGoogleAccessToken();
+        if (token != null) {
+          await _importFromGoogleCalendar(token, startOfMonth, endOfMonth);
+          await prefs.setString('last_google_sync_month', currentMonthStr);
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     _nowTimer?.cancel();
-    _timelineScrollController.dispose();
+    _verticalScrollController.dispose();
+    _headerHorizontalController.dispose();
+    _gridHorizontalController.dispose();
     super.dispose();
   }
 
@@ -103,11 +149,178 @@ class _TodoPageState extends State<TodoPage> {
     await prefs.setString('todo_tasks', json.encode(_tasks.map((t) => t.toJson()).toList()));
   }
 
-  void _showAddTaskDialog() {
-    final titleController = TextEditingController();
-    TimeOfDay startTime = TimeOfDay.now();
-    TimeOfDay endTime = TimeOfDay.fromDateTime(DateTime.now().add(const Duration(hours: 1)));
-    Recurrence recurrence = Recurrence.none;
+  // --- GOOGLE CALENDAR SYNC ---
+
+  Future<void> _syncWithGoogleCalendar() async {
+    if (_isSyncing) return;
+    setState(() => _isSyncing = true);
+
+    try {
+      final token = await widget.authService.getGoogleAccessToken();
+      if (token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vă rugăm să vă autentificați cu Google mai întâi.'))
+        );
+        return;
+      }
+
+      await _exportToGoogleCalendar(token);
+      
+      final now = DateTime.now();
+      final start = DateTime(now.year, now.month, now.day);
+      final end = start.add(const Duration(days: 7, hours: 23, minutes: 59));
+      
+      await _importFromGoogleCalendar(token, start, end);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sincronizare pentru următoarea săptămână finalizată!'))
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Eroare la sincronizare: $e'))
+      );
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
+  }
+
+  Future<void> _importFromGoogleCalendar(String token, DateTime from, DateTime to) async {
+    final timeMin = from.toUtc().toIso8601String();
+    final timeMax = to.toUtc().toIso8601String();
+
+    final url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=$timeMin&timeMax=$timeMax&singleEvents=true';
+
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final List<dynamic> items = data['items'] ?? [];
+
+      setState(() {
+        for (var item in items) {
+          final String? eventId = item['id'];
+          final String title = item['summary'] ?? '(Fără titlu)';
+          final dynamic start = item['start']['dateTime'] ?? item['start']['date'];
+          final dynamic end = item['end']['dateTime'] ?? item['end']['date'];
+          
+          if (start == null || end == null) continue;
+
+          final DateTime startTime = DateTime.parse(start).toLocal();
+          final DateTime endTime = DateTime.parse(end).toLocal();
+
+          final int existingIdx = _tasks.indexWhere((t) => t.calendarEventId == eventId);
+          
+          if (existingIdx != -1) {
+            _tasks[existingIdx].title = title;
+            _tasks[existingIdx].startTime = startTime;
+            _tasks[existingIdx].endTime = endTime;
+          } else {
+            final bool existsByContent = _tasks.any((t) => 
+              t.title == title && 
+              t.startTime.isAtSameMomentAs(startTime) && 
+              t.endTime.isAtSameMomentAs(endTime)
+            );
+
+            if (!existsByContent) {
+              _tasks.add(TodoTask(
+                id: DateTime.now().millisecondsSinceEpoch.toString() + eventId!,
+                title: title,
+                startTime: startTime,
+                endTime: endTime,
+                calendarEventId: eventId,
+              ));
+            }
+          }
+        }
+      });
+      await _saveTasks();
+    }
+  }
+
+  Future<void> _exportToGoogleCalendar(String token) async {
+    for (var task in _tasks) {
+      if (task.calendarEventId == null) {
+        await _createGoogleCalendarEvent(task, token);
+      }
+    }
+  }
+
+  Future<void> _createGoogleCalendarEvent(TodoTask task, String token) async {
+    final url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+    
+    final event = {
+      'summary': task.title,
+      'start': {'dateTime': task.startTime.toUtc().toIso8601String()},
+      'end': {'dateTime': task.endTime.toUtc().toIso8601String()},
+    };
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode(event),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      task.calendarEventId = data['id'];
+    }
+  }
+
+  Future<void> _updateGoogleCalendarEvent(TodoTask task) async {
+    if (task.calendarEventId == null) return;
+    
+    final token = await widget.authService.getGoogleAccessToken();
+    if (token == null) return;
+
+    final url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events/${task.calendarEventId}';
+    
+    final event = {
+      'summary': task.title,
+      'start': {'dateTime': task.startTime.toUtc().toIso8601String()},
+      'end': {'dateTime': task.endTime.toUtc().toIso8601String()},
+    };
+
+    await http.patch(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode(event),
+    );
+  }
+
+  Future<void> _deleteGoogleCalendarEvent(String eventId) async {
+    final token = await widget.authService.getGoogleAccessToken();
+    if (token == null) return;
+
+    final url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events/$eventId';
+    
+    await http.delete(
+      Uri.parse(url),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  void _showTaskDialog({TodoTask? taskToEdit, DateTime? initialDate}) {
+    final targetDate = initialDate ?? _selectedDate;
+    final titleController = TextEditingController(text: taskToEdit?.title ?? '');
+    
+    TimeOfDay startTime = taskToEdit != null 
+        ? TimeOfDay.fromDateTime(taskToEdit.startTime)
+        : (initialDate != null ? const TimeOfDay(hour: 9, minute: 0) : TimeOfDay.now());
+        
+    TimeOfDay endTime = taskToEdit != null
+        ? TimeOfDay.fromDateTime(taskToEdit.endTime)
+        : TimeOfDay.fromDateTime((taskToEdit?.startTime ?? (initialDate != null ? DateTime(targetDate.year, targetDate.month, targetDate.day, 9, 0) : DateTime.now())).add(const Duration(hours: 1)));
+    
+    Recurrence recurrence = taskToEdit?.recurrence ?? Recurrence.none;
 
     showModalBottomSheet(
       context: context,
@@ -129,11 +342,31 @@ class _TodoPageState extends State<TodoPage> {
             children: [
               Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 24),
-              const Text('Sarcina Nouă', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(taskToEdit == null ? 'Sarcina Nouă' : 'Editare Sarcină', 
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  if (taskToEdit != null)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      onPressed: () {
+                        if (taskToEdit.calendarEventId != null) {
+                          _deleteGoogleCalendarEvent(taskToEdit.calendarEventId!);
+                        }
+                        setState(() => _tasks.remove(taskToEdit));
+                        _saveTasks();
+                        Navigator.pop(context);
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(DateFormat('EEEE, d MMMM').format(targetDate), style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 24),
               TextField(
                 controller: titleController,
-                autofocus: true,
+                autofocus: taskToEdit == null,
                 style: const TextStyle(fontSize: 18),
                 decoration: InputDecoration(
                   hintText: 'Ce vrei să faci?',
@@ -216,22 +449,41 @@ class _TodoPageState extends State<TodoPage> {
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     if (titleController.text.isEmpty) return;
-                    final start = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, startTime.hour, startTime.minute);
-                    final end = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, endTime.hour, endTime.minute);
-                    final newTask = TodoTask(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      title: titleController.text,
-                      startTime: start,
-                      endTime: end,
-                      recurrence: recurrence,
-                    );
-                    setState(() => _tasks.add(newTask));
+                    
+                    final start = DateTime(targetDate.year, targetDate.month, targetDate.day, startTime.hour, startTime.minute);
+                    final end = DateTime(targetDate.year, targetDate.month, targetDate.day, endTime.hour, endTime.minute);
+                    
+                    if (taskToEdit == null) {
+                      final newTask = TodoTask(
+                        id: DateTime.now().millisecondsSinceEpoch.toString(),
+                        title: titleController.text,
+                        startTime: start,
+                        endTime: end,
+                        recurrence: recurrence,
+                      );
+                      setState(() => _tasks.add(newTask));
+                      
+                      final token = await widget.authService.getGoogleAccessToken();
+                      if (token != null) {
+                        await _createGoogleCalendarEvent(newTask, token);
+                      }
+                    } else {
+                      setState(() {
+                        taskToEdit.title = titleController.text;
+                        taskToEdit.startTime = start;
+                        taskToEdit.endTime = end;
+                        taskToEdit.recurrence = recurrence;
+                      });
+                      await _updateGoogleCalendarEvent(taskToEdit);
+                    }
+                    
                     _saveTasks();
                     Navigator.pop(context);
                   },
-                  child: const Text('Salvează Sarcina', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: Text(taskToEdit == null ? 'Salvează Sarcina' : 'Actualizează Sarcina', 
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -241,23 +493,44 @@ class _TodoPageState extends State<TodoPage> {
     );
   }
 
+  DateTime get _startOfWeek {
+    int dayOffset = _selectedDate.weekday - 1; // Monday = 1
+    return DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day).subtract(Duration(days: dayOffset));
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final bool isToday = _selectedDate.year == now.year && 
-                        _selectedDate.month == now.month && 
-                        _selectedDate.day == now.day;
+    // Use week view only if enabled AND on desktop
+    final bool isActualWeekView = _isWeekView && _isDesktop;
+    final double dayWidth = isActualWeekView ? 150.0 : MediaQuery.of(context).size.width - 60;
+    final double totalWidth = isActualWeekView ? dayWidth * 7 : dayWidth;
 
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Focus Timeline', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text(DateFormat('EEEE, d MMMM').format(_selectedDate), style: const TextStyle(fontSize: 12)),
+            Text(isActualWeekView ? 'Vizualizare Săptămână' : 'Focus Timeline', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(DateFormat('MMMM yyyy').format(_selectedDate), style: const TextStyle(fontSize: 12)),
           ],
         ),
         actions: [
+          if (_isDesktop) // Only show toggle on desktop
+            IconButton(
+              icon: Icon(isActualWeekView ? Icons.view_day : Icons.view_week),
+              onPressed: () => setState(() => _isWeekView = !_isWeekView),
+            ),
+          if (_isSyncing)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.sync),
+              onPressed: _syncWithGoogleCalendar,
+            ),
           IconButton(
             icon: const Icon(Icons.calendar_month),
             onPressed: () async {
@@ -272,113 +545,169 @@ class _TodoPageState extends State<TodoPage> {
           ),
         ],
       ),
-      body: Stack(
+      body: Column(
         children: [
-          ListView.builder(
-            controller: _timelineScrollController,
-            padding: const EdgeInsets.only(bottom: 100),
-            itemCount: 25, 
-            itemBuilder: (context, hour) {
-              return Container(
-                height: 80,
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(
-                        '${(hour % 24).toString().padLeft(2, '0')}:00', 
-                        style: TextStyle(
-                          color: hour == 24 ? Theme.of(context).colorScheme.primary : Colors.grey, 
-                          fontSize: 12,
-                          fontWeight: hour == 24 ? FontWeight.bold : FontWeight.normal,
-                        )
-                      ),
+          // 1. Horizontal Header (Days)
+          Container(
+            height: 40,
+            color: Theme.of(context).colorScheme.surface,
+            child: Row(
+              children: [
+                const SizedBox(width: 60), 
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _headerHorizontalController,
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: List.generate(isActualWeekView ? 7 : 1, (index) {
+                        final date = isActualWeekView ? _startOfWeek.add(Duration(days: index)) : _selectedDate;
+                        final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
+                        return Container(
+                          width: dayWidth,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                              bottom: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                            ),
+                          ),
+                          child: Text(
+                            DateFormat(isActualWeekView ? 'EEE d' : 'EEEE, d MMMM').format(date),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                              color: isToday ? Theme.of(context).colorScheme.primary : null,
+                            ),
+                          ),
+                        );
+                      }),
                     ),
-                    Expanded(
-                      child: Container(
-                        color: Colors.transparent,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              );
-            },
+              ],
+            ),
           ),
-          ..._tasks.where((t) {
-            if (t.recurrence == Recurrence.daily) return true;
-            if (t.recurrence == Recurrence.weekly && t.startTime.weekday == _selectedDate.weekday) return true;
-            return t.startTime.year == _selectedDate.year && t.startTime.month == _selectedDate.month && t.startTime.day == _selectedDate.day;
-          }).map((task) {
-            double top = (task.startTime.hour * 80.0) + (task.startTime.minute * 80.0 / 60.0);
-            double height = ((task.endTime.hour - task.startTime.hour) * 80.0) + ((task.endTime.minute - task.startTime.minute) * 80.0 / 60.0);
-            if (height < 40) height = 40;
-
-            return Positioned(
-              top: top,
-              left: 70,
-              right: 16,
-              child: GestureDetector(
-                onLongPress: () {
-                  setState(() => _tasks.remove(task));
-                  _saveTasks();
-                },
-                child: Container(
-                  height: height,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Theme.of(context).colorScheme.primary),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      if (height > 50)
-                        Text('${DateFormat.Hm().format(task.startTime)} - ${DateFormat.Hm().format(task.endTime)}', style: const TextStyle(fontSize: 11)),
-                      if (task.recurrence != Recurrence.none)
-                        Icon(Icons.repeat, size: 12, color: Theme.of(context).colorScheme.primary),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-
-          if (isToday)
-            Positioned(
-              top: (now.hour * 80.0) + (now.minute * 80.0 / 60.0),
-              left: 0,
-              right: 0,
+          // 2. Main Scrollable Area
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _verticalScrollController,
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     width: 60,
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    color: Theme.of(context).colorScheme.surface,
+                    child: Column(
+                      children: List.generate(24, (hour) => Container(
+                        height: 80,
+                        alignment: Alignment.topCenter,
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          '${hour.toString().padLeft(2, '0')}:00',
+                          style: const TextStyle(color: Colors.grey, fontSize: 11),
+                        ),
+                      )),
                     ),
                   ),
                   Expanded(
-                    child: Container(
-                      height: 2,
-                      color: Colors.red.withOpacity(0.5),
+                    child: SingleChildScrollView(
+                      controller: _gridHorizontalController,
+                      scrollDirection: Axis.horizontal,
+                      child: Container(
+                        width: totalWidth,
+                        height: 24 * 80.0,
+                        child: Stack(
+                          children: [
+                            Row(
+                              children: List.generate(isActualWeekView ? 7 : 1, (dayIdx) => Container(
+                                width: dayWidth,
+                                child: Column(
+                                  children: List.generate(24, (h) => Container(
+                                    height: 80,
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        left: BorderSide(color: Colors.grey.withOpacity(0.1)),
+                                        bottom: BorderSide(color: Colors.grey.withOpacity(0.1)),
+                                      ),
+                                    ),
+                                  )),
+                                ),
+                              )),
+                            ),
+                            ...List.generate(isActualWeekView ? 7 : 1, (dayIdx) {
+                              final date = isActualWeekView ? _startOfWeek.add(Duration(days: dayIdx)) : _selectedDate;
+                              final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
+                              
+                              final dayTasks = _tasks.where((t) {
+                                if (t.recurrence == Recurrence.daily) return true;
+                                if (t.recurrence == Recurrence.weekly && t.startTime.weekday == date.weekday) return true;
+                                return t.startTime.year == date.year && t.startTime.month == date.month && t.startTime.day == date.day;
+                              });
+
+                              return Stack(
+                                children: [
+                                  if (isToday)
+                                    Positioned(
+                                      top: (now.hour * 80.0) + (now.minute * 80.0 / 60.0),
+                                      left: dayIdx * dayWidth,
+                                      width: dayWidth,
+                                      child: Row(
+                                        children: [
+                                          Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                                          Expanded(child: Container(height: 2, color: Colors.red.withOpacity(0.5))),
+                                        ],
+                                      ),
+                                    ),
+                                  ...dayTasks.map((task) {
+                                    double top = (task.startTime.hour * 80.0) + (task.startTime.minute * 80.0 / 60.0);
+                                    double height = ((task.endTime.hour - task.startTime.hour) * 80.0) + ((task.endTime.minute - task.startTime.minute) * 80.0 / 60.0);
+                                    if (height < 30) height = 30;
+
+                                    return Positioned(
+                                      top: top,
+                                      left: (dayIdx * dayWidth) + 4,
+                                      width: dayWidth - 8,
+                                      child: GestureDetector(
+                                        onTap: () => _showTaskDialog(taskToEdit: task, initialDate: date),
+                                        child: Container(
+                                          height: height,
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+                                          ),
+                                          child: SingleChildScrollView(
+                                            physics: const NeverScrollableScrollPhysics(),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                                if (height > 40)
+                                                  Text(DateFormat.Hm().format(task.startTime), style: const TextStyle(fontSize: 9)),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddTaskDialog,
+        onPressed: () => _showTaskDialog(),
         backgroundColor: Theme.of(context).colorScheme.primary,
         child: const Icon(Icons.add, color: Colors.white),
       ),

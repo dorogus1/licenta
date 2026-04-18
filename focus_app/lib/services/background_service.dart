@@ -9,6 +9,7 @@ import 'package:device_apps/device_apps.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:system_alert_window/system_alert_window.dart';
 
 Future<void> initializeBackgroundService() async {
   final service = FlutterBackgroundService();
@@ -59,9 +60,19 @@ void onStart(ServiceInstance service) async {
   List<String> blockedApps = prefs.getStringList('blocked_apps') ?? [];
   bool isFocusing = false;
   String? lastActiveEventId;
+  bool isOverlayShowing = false;
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+
+  // Listen for overlay button clicks
+  SystemAlertWindow.registerOnClickListener((tag) {
+    if (tag == "back_to_focus") {
+      SystemAlertWindow.closeSystemWindow(prefMode: SystemWindowPrefMode.OVERLAY);
+      isOverlayShowing = false;
+      DeviceApps.openApp("com.example.focus_app");
+    }
+  });
 
   // Listen to UI
   service.on('setBlockList').listen((event) {
@@ -82,6 +93,10 @@ void onStart(ServiceInstance service) async {
     isFocusing = false;
     if (service is AndroidServiceInstance) {
       service.setForegroundNotificationInfo(title: "Focus Shield", content: "Idle");
+    }
+    if (isOverlayShowing) {
+      SystemAlertWindow.closeSystemWindow(prefMode: SystemWindowPrefMode.OVERLAY);
+      isOverlayShowing = false;
     }
   });
 
@@ -121,12 +136,10 @@ void onStart(ServiceInstance service) async {
           lastActiveEventId = currentEventId;
           service.invoke('startFocus'); 
         } else if (!foundActive && isFocusing && lastActiveEventId != null) {
-          // Event just ended
           isFocusing = false;
           lastActiveEventId = null;
           service.invoke('stopFocus');
           
-          // Notify user
           await flutterLocalNotificationsPlugin.show(
             999,
             'Sesiune Focus Finalizată',
@@ -140,7 +153,7 @@ void onStart(ServiceInstance service) async {
     } catch (_) {}
   });
 
-  // Monitoring Loop (Running only if focusing)
+  // Monitoring Loop
   Timer.periodic(const Duration(seconds: 2), (timer) async {
     if (!isFocusing || blockedApps.isEmpty) return;
 
@@ -152,7 +165,75 @@ void onStart(ServiceInstance service) async {
       if (stats.isNotEmpty) {
         String currentPkg = stats.first.packageName ?? "";
         if (currentPkg != "com.example.focus_app" && blockedApps.contains(currentPkg)) {
-          await DeviceApps.openApp("com.example.focus_app");
+          if (!isOverlayShowing) {
+            SystemWindowHeader header = SystemWindowHeader(
+              title: SystemWindowText(text: "", fontSize: 0, textColor: Colors.transparent),
+              decoration: SystemWindowDecoration(startColor: Colors.transparent),
+            );
+            SystemWindowBody body = SystemWindowBody(
+              rows: [
+                EachRow(
+                  columns: [
+                    EachColumn(
+                      text: SystemWindowText(text: "APLICAȚIE BLOCATĂ", fontSize: 24, textColor: Colors.white),
+                    ),
+                  ],
+                  gravity: ContentGravity.CENTER,
+                ),
+                EachRow(
+                  columns: [
+                    EachColumn(
+                      text: SystemWindowText(
+                        text: "\nTimpul tău este prețios! Rămâi concentrat pe ceea ce contează cu adevărat.", 
+                        fontSize: 18, 
+                        textColor: Colors.white.withOpacity(0.9)
+                      ),
+                    ),
+                  ],
+                  gravity: ContentGravity.CENTER,
+                ),
+              ],
+              padding: SystemWindowPadding(left: 24, right: 24, bottom: 24, top: 24),
+              decoration: SystemWindowDecoration(
+                startColor: Colors.black.withOpacity(0.85),
+                endColor: Colors.black.withOpacity(0.85),
+              ),
+            );
+            SystemWindowFooter footer = SystemWindowFooter(
+              buttons: [
+                SystemWindowButton(
+                  text: SystemWindowText(text: "ÎNAPOI LA FOCUS", fontSize: 14, textColor: Colors.white),
+                  tag: "back_to_focus",
+                  width: 0,
+                  height: SystemWindowButton.WRAP_CONTENT,
+                  decoration: SystemWindowDecoration(
+                    startColor: const Color(0xFF6C63FF),
+                    endColor: const Color(0xFF6C63FF),
+                    borderRadius: 12,
+                  ),
+                )
+              ],
+              padding: SystemWindowPadding(left: 32, right: 32, bottom: 40, top: 0),
+              decoration: SystemWindowDecoration(startColor: Colors.transparent),
+            );
+
+            await SystemAlertWindow.showSystemWindow(
+              height: -1, // MATCH_PARENT
+              width: -1,  // MATCH_PARENT
+              header: header,
+              body: body,
+              footer: footer,
+              margin: SystemWindowMargin(left: 0, right: 0, top: 0, bottom: 0),
+              gravity: SystemWindowGravity.CENTER,
+              prefMode: SystemWindowPrefMode.OVERLAY
+            );
+            isOverlayShowing = true;
+          }
+        } else {
+          if (isOverlayShowing) {
+            await SystemAlertWindow.closeSystemWindow(prefMode: SystemWindowPrefMode.OVERLAY);
+            isOverlayShowing = false;
+          }
         }
       }
     } catch (_) {}

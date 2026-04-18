@@ -1,5 +1,8 @@
 #include "overlay_window.h"
 #include <string>
+#include <dwmapi.h>
+
+#pragma comment(lib, "dwmapi.lib")
 
 OverlayWindow::OverlayWindow() {}
 
@@ -10,7 +13,6 @@ void OverlayWindow::ShowOver(HWND target, const std::string& appName) {
   appName_ = appName;
   target_ = target;
   if (!hwnd_) {
-    // register class
     WNDCLASSA wc = {0};
     wc.lpfnWndProc = OverlayWindow::WndProc;
     wc.hInstance = GetModuleHandle(NULL);
@@ -18,34 +20,32 @@ void OverlayWindow::ShowOver(HWND target, const std::string& appName) {
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     RegisterClassA(&wc);
 
-    // Create a centered window
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-    int w = 500;
-    int h = 300;
+    int w = 450;
+    int h = 280;
     int x = (screenWidth - w) / 2;
     int y = (screenHeight - h) / 2;
 
-    hwnd_ = CreateWindowExA(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
-                             "FocusAppOverlay", "",
+    hwnd_ = CreateWindowExA(WS_EX_TOPMOST | WS_EX_LAYERED,
+                             "FocusAppOverlay", "Focus Shield",
                              WS_POPUP,
                              x, y, w, h,
                              NULL, NULL, GetModuleHandle(NULL), this);
 
-    // Subtle X button in top-left
-    CreateWindowA("BUTTON", "X", WS_CHILD | WS_VISIBLE | BS_FLAT,
-                  10, 10, 30, 30, hwnd_, (HMENU)1001, GetModuleHandle(NULL), NULL);
+    DWM_WINDOW_CORNER_PREFERENCE cornerPreference = DWMWCP_ROUND;
+    DwmSetWindowAttribute(hwnd_, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPreference, sizeof(cornerPreference));
 
-    SetLayeredWindowAttributes(hwnd_, 0, 240, LWA_ALPHA);
+    SetLayeredWindowAttributes(hwnd_, 0, 250, LWA_ALPHA);
   }
 
   ShowWindow(hwnd_, SW_SHOW);
   UpdateWindow(hwnd_);
+  SetForegroundWindow(hwnd_);
 }
 
 void OverlayWindow::Hide() {
   if (hwnd_) {
-    KillTimer(hwnd_, 1);
     DestroyWindow(hwnd_);
     hwnd_ = nullptr;
     target_ = nullptr;
@@ -56,7 +56,6 @@ bool OverlayWindow::IsVisible() const { return hwnd_ && IsWindow(hwnd_); }
 
 LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
   if (uMsg == WM_CREATE) {
-    // store pointer to instance
     CREATESTRUCTA* cs = (CREATESTRUCTA*)lParam;
     SetWindowLongPtrA(hwnd, GWLP_USERDATA, (LONG_PTR)cs->lpCreateParams);
     return 0;
@@ -64,9 +63,13 @@ LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
   
   auto inst = (OverlayWindow*)GetWindowLongPtrA(hwnd, GWLP_USERDATA);
 
-  if (uMsg == WM_COMMAND) {
-    if (LOWORD(wParam) == 1001) {
-      // subtle X button clicked
+  if (uMsg == WM_LBUTTONDOWN) {
+    int x = LOWORD(lParam);
+    int y = HIWORD(lParam);
+    RECT r;
+    GetClientRect(hwnd, &r);
+    // Custom Close Button Hit Test (Top Right)
+    if (x > r.right - 45 && y < 45) {
       if (inst && inst->target_) {
         DWORD pid = 0;
         GetWindowThreadProcessId(inst->target_, &pid);
@@ -77,8 +80,8 @@ LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         }
         inst->Hide();
       }
-      return 0;
     }
+    return 0;
   }
 
   if (uMsg == WM_PAINT) {
@@ -87,41 +90,53 @@ LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     RECT r;
     GetClientRect(hwnd, &r);
     
-    // Smooth Dark Background
-    HBRUSH brush = CreateSolidBrush(RGB(30, 30, 30));
-    FillRect(dc, &r, brush);
-    DeleteObject(brush);
-    
-    // White Text
-    SetTextColor(dc, RGB(240, 240, 240));
+    // 1. Modern Dark Background
+    HBRUSH bgBrush = CreateSolidBrush(RGB(20, 20, 25));
+    FillRect(dc, &r, bgBrush);
+    DeleteObject(bgBrush);
+
+    // 2. Accent Top Border
+    RECT borderRect = {0, 0, r.right, 4};
+    HBRUSH accentBrush = CreateSolidBrush(RGB(108, 99, 255)); // Indigo Accent
+    FillRect(dc, &borderRect, accentBrush);
+    DeleteObject(accentBrush);
+
+    // 3. Custom Close Button (X)
+    SetTextColor(dc, RGB(150, 150, 150));
     SetBkMode(dc, TRANSPARENT);
-    
-    // Title Font
-    HFONT hFontTitle = CreateFontA(28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 
-                                  OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
-                                  DEFAULT_PITCH | FF_SWISS, "Segoe UI");
-    HFONT hOldFont = (HFONT)SelectObject(dc, hFontTitle);
-    
-    RECT titleRect = r;
-    titleRect.top += 60;
-    DrawTextA(dc, "Timpul tau este pretios!", -1, &titleRect, DT_CENTER | DT_TOP | DT_SINGLELINE | DT_NOCLIP);
-    
-    // Subtitle Font
-    HFONT hFontSub = CreateFontA(20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 
-                                 OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
-                                 DEFAULT_PITCH | FF_SWISS, "Segoe UI");
-    SelectObject(dc, hFontSub);
-    
-    RECT textRect = r;
-    textRect.top += 120;
-    textRect.left += 40;
-    textRect.right -= 40;
-    DrawTextA(dc, "Aceasta aplicatie a fost blocata pentru a te ajuta sa ramai productiv si concentrat pe ceea ce conteaza cu adevarat.", -1, &textRect, DT_CENTER | DT_TOP | DT_WORDBREAK | DT_NOCLIP);
-    
-    SelectObject(dc, hOldFont);
+    HFONT hFontX = CreateFontA(20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, 0, 0, "Segoe MDL2 Assets");
+    if (!hFontX) hFontX = CreateFontA(18, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, 0, 0, "Arial");
+    SelectObject(dc, hFontX);
+    TextOutA(dc, r.right - 30, 15, "X", 1);
+    DeleteObject(hFontX);
+
+    // 4. Shield Icon (Simple GDI Drawing)
+    HPEN hIconPen = CreatePen(PS_SOLID, 3, RGB(108, 99, 255));
+    SelectObject(dc, hIconPen);
+    MoveToEx(dc, r.right / 2 - 20, 40, NULL);
+    LineTo(dc, r.right / 2 + 20, 40);
+    LineTo(dc, r.right / 2 + 20, 60);
+    LineTo(dc, r.right / 2, 80);
+    LineTo(dc, r.right / 2 - 20, 60);
+    LineTo(dc, r.right / 2 - 20, 40);
+    DeleteObject(hIconPen);
+
+    // 5. Main Title
+    SetTextColor(dc, RGB(255, 255, 255));
+    HFONT hFontTitle = CreateFontA(26, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, PROOF_QUALITY, 0, "Segoe UI");
+    SelectObject(dc, hFontTitle);
+    RECT titleRect = {40, 100, r.right - 40, 140};
+    DrawTextA(dc, "Timpul tău este prețios!", -1, &titleRect, DT_CENTER | DT_SINGLELINE);
     DeleteObject(hFontTitle);
+
+    // 6. Description Text
+    SetTextColor(dc, RGB(180, 180, 190));
+    HFONT hFontSub = CreateFontA(18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, PROOF_QUALITY, 0, "Segoe UI");
+    SelectObject(dc, hFontSub);
+    RECT textRect = {50, 150, r.right - 50, 240};
+    DrawTextA(dc, "Această aplicație a fost blocată pentru a te ajuta să rămâi productiv și concentrat pe ceea ce contează cu adevărat.", -1, &textRect, DT_CENTER | DT_WORDBREAK);
     DeleteObject(hFontSub);
-    
+
     EndPaint(hwnd, &ps);
     return 0;
   }
