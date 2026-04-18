@@ -202,7 +202,7 @@ void ProcessMonitor::ScanAndBlock() {
       }
 
       if (blocked) {
-        ShowWindow(hwnd, SW_HIDE);
+        // ShowWindow(hwnd, SW_HIDE);
         // OutputDebugStringA(("ProcessMonitor: Polling Block -> " + info.name).c_str());
         if (blocked_cb_) blocked_cb_(info.name, pid, hwnd);
       }
@@ -274,7 +274,7 @@ void ProcessMonitor::HandleForegroundChange(const std::string& procName, uint32_
   // 1. Check current process
   if (isBlocked(procName)) {
     OutputDebugStringA(("ProcessMonitor: Direct Block -> " + procName).c_str());
-    ShowWindow(hwnd, SW_HIDE);
+    // ShowWindow(hwnd, SW_HIDE);
     if (blocked_cb_) blocked_cb_(procName, pid, hwnd);
     return;
   }
@@ -291,8 +291,8 @@ void ProcessMonitor::HandleForegroundChange(const std::string& procName, uint32_
 
     if (isBlocked(pName)) {
       OutputDebugStringA(("ProcessMonitor: Ancestry Block (Ancestor: " + pName + ") -> " + procName).c_str());
-      ShowWindow(hwnd, SW_HIDE);
-      if (blocked_cb_) blocked_cb_(procName, pid, hwnd);
+      // ShowWindow(hwnd, SW_HIDE);
+      if (blocked_cb_) blocked_cb_(pName, pid, hwnd);
       return;
     }
     currentPid = ppid;

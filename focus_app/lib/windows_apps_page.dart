@@ -26,13 +26,7 @@ class _WindowsAppsPageState extends State<WindowsAppsPage> {
     super.initState();
     _blockedSubscription = WindowsProcessMonitor.onBlocked.listen((p) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Blocked ${p.name}', style: const TextStyle(color: Colors.white)),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Removed SnackBar notification as the overlay provides the necessary feedback.
     });
     _loadBlockedFromPrefs().then((_) => _loadInstalled());
   }
