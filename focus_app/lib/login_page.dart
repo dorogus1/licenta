@@ -201,6 +201,7 @@ class _LoginPageState extends State<LoginPage> {
                       if (error == null) {
                          // Show success popup
                          if (context.mounted) {
+                           final primaryColor = Theme.of(context).colorScheme.primary;
                            showDialog(
                              context: context,
                              barrierDismissible: false,
@@ -208,13 +209,13 @@ class _LoginPageState extends State<LoginPage> {
                                backgroundColor: const Color(0xFF1E1E1E),
                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                title: Row(
-                                 children: [
+                                 children: const [
                                    Icon(Icons.check_circle, color: Colors.greenAccent),
                                    SizedBox(width: 12),
                                    Text('Succes!', style: TextStyle(color: Colors.white)),
                                  ],
                                ),
-                               content: Text(
+                               content: const Text(
                                  'Te-ai autentificat cu succes folosind Google. Bine ai venit!',
                                  style: TextStyle(color: Colors.white70),
                                ),
@@ -224,7 +225,7 @@ class _LoginPageState extends State<LoginPage> {
                                      Navigator.pop(ctx);
                                      widget.onLoginSuccess();
                                    },
-                                   child: Text('Incepe', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                                   child: Text('Incepe', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
                                  ),
                                ],
                              ),

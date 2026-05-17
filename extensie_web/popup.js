@@ -44,9 +44,9 @@ if (!forceWebSockets()) {
         if (forceWebSockets()) {
             clearInterval(fwInterval);
         }
-    }, 100);
-    // Stop trying after 5 seconds
-    setTimeout(() => clearInterval(fwInterval), 5000);
+    }, 500); // Increased interval for better performance
+    // Stop trying after 2 seconds to save resources
+    setTimeout(() => clearInterval(fwInterval), 2000);
 }
 
 let currentUser = null; // Store logged in user for timer sync

@@ -21,40 +21,61 @@ let sessionUnsub = null; // New listener for session
 let currentUserId = null;
 
 // --- TIMER MANAGEMENT ---
-let timerInterval = null;
+// setInterval is unreliable in Manifest V3 Service Workers. 
+// We use chrome.alarms for the end of the session and storage for state.
 
 function startBackgroundTimer(durationSeconds) {
-    if (timerInterval) clearInterval(timerInterval);
+    const now = Date.now();
+    const endTime = now + (durationSeconds * 1000);
     
-    let timeLeft = durationSeconds;
     chrome.storage.local.set({ 
         timerRunning: true, 
-        timerTimeLeft: timeLeft, 
-        timerLastUpdate: Date.now(),
+        timerTimeLeft: durationSeconds, 
+        timerLastUpdate: now,
+        timerEndTime: endTime,
         focusActive: true 
     });
 
-    timerInterval = setInterval(() => {
-        timeLeft--;
-        if (timeLeft <= 0) {
-            stopBackgroundTimer();
-        } else {
-            chrome.storage.local.set({ 
-                timerTimeLeft: timeLeft, 
-                timerLastUpdate: Date.now() 
-            });
-        }
-    }, 1000);
+    // Create an alarm for when the timer should finish
+    chrome.alarms.create("timerEnd", { when: endTime });
+    console.log('[background] Alarm set for timer end in', durationSeconds, 's');
 }
 
 function stopBackgroundTimer() {
-    if (timerInterval) clearInterval(timerInterval);
-    timerInterval = null;
+    chrome.alarms.clear("timerEnd");
     chrome.storage.local.set({ 
         timerRunning: false, 
-        focusActive: false 
+        focusActive: false,
+        timerEndTime: 0
     });
 }
+
+// Handle alarm for timer completion
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "timerEnd") {
+        console.log('[background] Timer alarm fired.');
+        stopBackgroundTimer();
+        
+        chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'icon.png',
+            title: 'Focus Session Finished',
+            message: 'Well done! Take a break.'
+        });
+        
+        // Update Firebase if logged in
+        if (currentUserId) {
+            const sessionRef = ref(db, `users/${currentUserId}/focus_session`);
+            set(sessionRef, {
+                isActive: false,
+                updatedBy: 'extension',
+                lastUpdatedAt: serverTimestamp()
+            });
+        }
+    } else if (alarm.name === "checkCalendar") {
+        checkCalendarEvents();
+    }
+});
 
 function setupPresence(user) {
     if (!user) return;
@@ -126,7 +147,7 @@ function setupPresence(user) {
                         }
                     } else {
                         // If session is NOT active and NOT updated by me, stop local timer
-                        if (!updatedByMe && timerInterval) {
+                        if (!updatedByMe) {
                             console.log('[background] Session stopped by other device. Stopping timer.');
                             stopBackgroundTimer();
                         }

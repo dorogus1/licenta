@@ -45,6 +45,18 @@ class _WindowsAppsPageState extends State<WindowsAppsPage> {
       final res = await WindowsProcessMonitor.getInstalledApps();
       if (!mounted) return;
       
+      // Pre-decode icons to avoid jank in ListView
+      for (var app in res) {
+        final iconDataStr = app['iconData'] as String? ?? '';
+        if (iconDataStr.isNotEmpty) {
+          try {
+            app['_decodedIcon'] = base64Decode(iconDataStr);
+          } catch (e) {
+            debugPrint('Error decoding icon for ${app['name']}: $e');
+          }
+        }
+      }
+
       setState(() {
         installed = res;
         _isLoading = false;
@@ -307,11 +319,7 @@ class _WindowsAppsPageState extends State<WindowsAppsPage> {
                 final exe = item['exe'] as String? ?? '';
                 final isBlocked = blocked.contains(exe.toLowerCase());
 
-                Uint8List? iconBytes;
-                final iconDataStr = item['iconData'] as String? ?? '';
-                if (iconDataStr.isNotEmpty) {
-                  try { iconBytes = base64Decode(iconDataStr); } catch (_) {}
-                }
+                final iconBytes = item['_decodedIcon'] as Uint8List?;
 
                 return ListTile(
                   leading: iconBytes != null 

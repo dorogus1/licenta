@@ -61,6 +61,7 @@ class TodoPage extends StatefulWidget {
 class _TodoPageState extends State<TodoPage> {
   List<TodoTask> _tasks = [];
   DateTime _selectedDate = DateTime.now();
+  final TextEditingController _quickAddController = TextEditingController();
   
   final ScrollController _verticalScrollController = ScrollController();
   final ScrollController _headerHorizontalController = ScrollController();
@@ -69,6 +70,7 @@ class _TodoPageState extends State<TodoPage> {
   Timer? _nowTimer;
   bool _isSyncing = false;
   bool _isWeekView = false;
+  bool _showTimeline = true;
 
   // Check if current platform is desktop
   bool get _isDesktop => !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
@@ -130,6 +132,7 @@ class _TodoPageState extends State<TodoPage> {
     _verticalScrollController.dispose();
     _headerHorizontalController.dispose();
     _gridHorizontalController.dispose();
+    _quickAddController.dispose();
     super.dispose();
   }
 
@@ -173,7 +176,7 @@ class _TodoPageState extends State<TodoPage> {
       await _importFromGoogleCalendar(token, start, end);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sincronizare pentru următoarea săptămână finalizată!'))
+        const SnackBar(content: Text('Sincronizare finalizată!'))
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -308,6 +311,33 @@ class _TodoPageState extends State<TodoPage> {
     );
   }
 
+  void _quickAddTask(String title) async {
+    if (title.isEmpty) return;
+    
+    // Default to current time + 1 hour
+    final start = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, DateTime.now().hour, DateTime.now().minute);
+    final end = start.add(const Duration(hours: 1));
+    
+    final newTask = TodoTask(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title,
+      startTime: start,
+      endTime: end,
+    );
+    
+    setState(() {
+      _tasks.add(newTask);
+      _quickAddController.clear();
+    });
+    
+    _saveTasks();
+    
+    final token = await widget.authService.getGoogleAccessToken();
+    if (token != null) {
+      await _createGoogleCalendarEvent(newTask, token);
+    }
+  }
+
   void _showTaskDialog({TodoTask? taskToEdit, DateTime? initialDate}) {
     final targetDate = initialDate ?? _selectedDate;
     final titleController = TextEditingController(text: taskToEdit?.title ?? '');
@@ -345,7 +375,7 @@ class _TodoPageState extends State<TodoPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(taskToEdit == null ? 'Sarcina Nouă' : 'Editare Sarcină', 
+                  Text(taskToEdit == null ? 'Nou Task' : 'Editare Task', 
                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                   if (taskToEdit != null)
                     IconButton(
@@ -369,75 +399,63 @@ class _TodoPageState extends State<TodoPage> {
                 autofocus: taskToEdit == null,
                 style: const TextStyle(fontSize: 18),
                 decoration: InputDecoration(
-                  hintText: 'Ce vrei să faci?',
+                  hintText: 'Ce vrei să realizezi?',
                   hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
-                  border: InputBorder.none,
-                  prefixIcon: const Icon(Icons.edit_note, size: 28),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.task_alt),
                 ),
               ),
-              const Divider(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               Row(
                 children: [
                   Expanded(
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showTimePicker(context: context, initialTime: startTime);
-                        if (picked != null) setSheetState(() => startTime = picked);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4), borderRadius: BorderRadius.circular(16)),
-                        child: Column(
-                          children: [
-                            const Text('START', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 4),
-                            Text(startTime.format(context), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('ÎNCEPUT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showTimePicker(context: context, initialTime: startTime);
+                            if (picked != null) setSheetState(() => startTime = picked);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surfaceVariant,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(startTime.format(context), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showTimePicker(context: context, initialTime: endTime);
-                        if (picked != null) setSheetState(() => endTime = picked);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.4), borderRadius: BorderRadius.circular(16)),
-                        child: Column(
-                          children: [
-                            const Text('FINAL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 4),
-                            Text(endTime.format(context), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('SFÂRȘIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showTimePicker(context: context, initialTime: endTime);
+                            if (picked != null) setSheetState(() => endTime = picked);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surfaceVariant,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(endTime.format(context), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 24),
-              const Text('Recurență', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
-              const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: Recurrence.values.map((r) {
-                    bool selected = recurrence == r;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: ChoiceChip(
-                        label: Text(r.name.toUpperCase()),
-                        selected: selected,
-                        onSelected: (val) => setSheetState(() => recurrence = r),
-                      ),
-                    );
-                  }).toList(),
-                ),
               ),
               const SizedBox(height: 32),
               SizedBox(
@@ -482,7 +500,7 @@ class _TodoPageState extends State<TodoPage> {
                     _saveTasks();
                     Navigator.pop(context);
                   },
-                  child: Text(taskToEdit == null ? 'Salvează Sarcina' : 'Actualizează Sarcina', 
+                  child: Text(taskToEdit == null ? 'Adaugă în Calendar' : 'Actualizează', 
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
@@ -494,29 +512,27 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   DateTime get _startOfWeek {
-    int dayOffset = _selectedDate.weekday - 1; // Monday = 1
+    int dayOffset = _selectedDate.weekday - 1; 
     return DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day).subtract(Duration(days: dayOffset));
   }
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    // Use week view only if enabled AND on desktop
     final bool isActualWeekView = _isWeekView && _isDesktop;
     final double dayWidth = isActualWeekView ? 150.0 : MediaQuery.of(context).size.width - 60;
     final double totalWidth = isActualWeekView ? dayWidth * 7 : dayWidth;
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(isActualWeekView ? 'Vizualizare Săptămână' : 'Focus Timeline', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text(DateFormat('MMMM yyyy').format(_selectedDate), style: const TextStyle(fontSize: 12)),
-          ],
-        ),
+        title: const Text('Task Tracker', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
-          if (_isDesktop) // Only show toggle on desktop
+          IconButton(
+            icon: Icon(_showTimeline ? Icons.list : Icons.view_timeline),
+            tooltip: _showTimeline ? 'View List' : 'View Timeline',
+            onPressed: () => setState(() => _showTimeline = !_showTimeline),
+          ),
+          if (_isDesktop)
             IconButton(
               icon: Icon(isActualWeekView ? Icons.view_day : Icons.view_week),
               onPressed: () => setState(() => _isWeekView = !_isWeekView),
@@ -531,185 +547,207 @@ class _TodoPageState extends State<TodoPage> {
               icon: const Icon(Icons.sync),
               onPressed: _syncWithGoogleCalendar,
             ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate,
-                firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-              );
-              if (picked != null) setState(() => _selectedDate = picked);
-            },
-          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
-          // 1. Horizontal Header (Days)
-          Container(
-            height: 40,
-            color: Theme.of(context).colorScheme.surface,
+          // Quick Add Field
+          Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                const SizedBox(width: 60), 
                 Expanded(
-                  child: SingleChildScrollView(
-                    controller: _headerHorizontalController,
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: List.generate(isActualWeekView ? 7 : 1, (index) {
-                        final date = isActualWeekView ? _startOfWeek.add(Duration(days: index)) : _selectedDate;
-                        final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
-                        return Container(
-                          width: dayWidth,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            border: Border(
-                              left: BorderSide(color: Colors.grey.withOpacity(0.2)),
-                              bottom: BorderSide(color: Colors.grey.withOpacity(0.2)),
-                            ),
-                          ),
-                          child: Text(
-                            DateFormat(isActualWeekView ? 'EEE d' : 'EEEE, d MMMM').format(date),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                              color: isToday ? Theme.of(context).colorScheme.primary : null,
-                            ),
-                          ),
-                        );
-                      }),
+                  child: TextField(
+                    controller: _quickAddController,
+                    decoration: InputDecoration(
+                      hintText: 'Adaugă un task rapid...',
+                      prefixIcon: const Icon(Icons.add),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
                     ),
+                    onSubmitted: _quickAddTask,
                   ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: () => _quickAddTask(_quickAddController.text),
+                  icon: const Icon(Icons.send),
                 ),
               ],
             ),
           ),
-          // 2. Main Scrollable Area
+          // Date Selector
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              children: [
+                IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1)))),
+                Expanded(
+                  child: TextButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _selectedDate,
+                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (picked != null) setState(() => _selectedDate = picked);
+                    },
+                    child: Text(
+                      DateFormat('EEEE, d MMMM').format(_selectedDate),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1)))),
+              ],
+            ),
+          ),
+          const Divider(),
+          // Content
+          Expanded(
+            child: _showTimeline ? _buildTimeline(dayWidth, totalWidth, isActualWeekView, now) : _buildListView(),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showTaskDialog(),
+        label: const Text('New Task'),
+        icon: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildListView() {
+    final dayTasks = _tasks.where((t) {
+      if (t.recurrence == Recurrence.daily) return true;
+      if (t.recurrence == Recurrence.weekly && t.startTime.weekday == _selectedDate.weekday) return true;
+      return t.startTime.year == _selectedDate.year && t.startTime.month == _selectedDate.month && t.startTime.day == _selectedDate.day;
+    }).toList();
+
+    if (dayTasks.isEmpty) {
+      return const Center(child: Text('Niciun task pentru azi.'));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: dayTasks.length,
+      itemBuilder: (context, index) {
+        final task = dayTasks[index];
+        return Card(
+          child: ListTile(
+            leading: Checkbox(
+              value: task.isCompleted,
+              onChanged: (val) {
+                setState(() => task.isCompleted = val ?? false);
+                _saveTasks();
+              },
+            ),
+            title: Text(task.title, style: TextStyle(decoration: task.isCompleted ? TextDecoration.lineThrough : null)),
+            subtitle: Text('${DateFormat.Hm().format(task.startTime)} - ${DateFormat.Hm().format(task.endTime)}'),
+            trailing: IconButton(icon: const Icon(Icons.edit), onPressed: () => _showTaskDialog(taskToEdit: task)),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTimeline(double dayWidth, double totalWidth, bool isActualWeekView, DateTime now) {
+    return SingleChildScrollView(
+      controller: _verticalScrollController,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 60,
+            child: Column(
+              children: List.generate(24, (hour) => Container(
+                height: 80,
+                alignment: Alignment.topCenter,
+                padding: const EdgeInsets.only(top: 8),
+                child: Text('${hour.toString().padLeft(2, '0')}:00', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+              )),
+            ),
+          ),
           Expanded(
             child: SingleChildScrollView(
-              controller: _verticalScrollController,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 60,
-                    color: Theme.of(context).colorScheme.surface,
-                    child: Column(
-                      children: List.generate(24, (hour) => Container(
-                        height: 80,
-                        alignment: Alignment.topCenter,
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          '${hour.toString().padLeft(2, '0')}:00',
-                          style: const TextStyle(color: Colors.grey, fontSize: 11),
+              controller: _gridHorizontalController,
+              scrollDirection: Axis.horizontal,
+              child: Container(
+                width: totalWidth,
+                height: 24 * 80.0,
+                child: Stack(
+                  children: [
+                    Row(
+                      children: List.generate(isActualWeekView ? 7 : 1, (dayIdx) => Container(
+                        width: dayWidth,
+                        child: Column(
+                          children: List.generate(24, (h) => Container(
+                            height: 80,
+                            decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey.withOpacity(0.1)), bottom: BorderSide(color: Colors.grey.withOpacity(0.1)))),
+                          )),
                         ),
                       )),
                     ),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      controller: _gridHorizontalController,
-                      scrollDirection: Axis.horizontal,
-                      child: Container(
-                        width: totalWidth,
-                        height: 24 * 80.0,
-                        child: Stack(
-                          children: [
-                            Row(
-                              children: List.generate(isActualWeekView ? 7 : 1, (dayIdx) => Container(
-                                width: dayWidth,
-                                child: Column(
-                                  children: List.generate(24, (h) => Container(
-                                    height: 80,
-                                    decoration: BoxDecoration(
-                                      border: Border(
-                                        left: BorderSide(color: Colors.grey.withOpacity(0.1)),
-                                        bottom: BorderSide(color: Colors.grey.withOpacity(0.1)),
-                                      ),
-                                    ),
-                                  )),
-                                ),
-                              )),
+                    ...List.generate(isActualWeekView ? 7 : 1, (dayIdx) {
+                      final date = isActualWeekView ? _startOfWeek.add(Duration(days: dayIdx)) : _selectedDate;
+                      final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
+                      final dayTasks = _tasks.where((t) {
+                        if (t.recurrence == Recurrence.daily) return true;
+                        if (t.recurrence == Recurrence.weekly && t.startTime.weekday == date.weekday) return true;
+                        return t.startTime.year == date.year && t.startTime.month == date.month && t.startTime.day == date.day;
+                      });
+
+                      return Stack(
+                        children: [
+                          if (isToday)
+                            Positioned(
+                              top: (now.hour * 80.0) + (now.minute * 80.0 / 60.0),
+                              left: dayIdx * dayWidth,
+                              width: dayWidth,
+                              child: Row(children: [Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)), Expanded(child: Container(height: 2, color: Colors.red.withOpacity(0.5)))]),
                             ),
-                            ...List.generate(isActualWeekView ? 7 : 1, (dayIdx) {
-                              final date = isActualWeekView ? _startOfWeek.add(Duration(days: dayIdx)) : _selectedDate;
-                              final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
-                              
-                              final dayTasks = _tasks.where((t) {
-                                if (t.recurrence == Recurrence.daily) return true;
-                                if (t.recurrence == Recurrence.weekly && t.startTime.weekday == date.weekday) return true;
-                                return t.startTime.year == date.year && t.startTime.month == date.month && t.startTime.day == date.day;
-                              });
+                          ...dayTasks.map((task) {
+                            double top = (task.startTime.hour * 80.0) + (task.startTime.minute * 80.0 / 60.0);
+                            double height = ((task.endTime.hour - task.startTime.hour) * 80.0) + ((task.endTime.minute - task.startTime.minute) * 80.0 / 60.0);
+                            if (height < 30) height = 30;
 
-                              return Stack(
-                                children: [
-                                  if (isToday)
-                                    Positioned(
-                                      top: (now.hour * 80.0) + (now.minute * 80.0 / 60.0),
-                                      left: dayIdx * dayWidth,
-                                      width: dayWidth,
-                                      child: Row(
-                                        children: [
-                                          Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
-                                          Expanded(child: Container(height: 2, color: Colors.red.withOpacity(0.5))),
-                                        ],
-                                      ),
-                                    ),
-                                  ...dayTasks.map((task) {
-                                    double top = (task.startTime.hour * 80.0) + (task.startTime.minute * 80.0 / 60.0);
-                                    double height = ((task.endTime.hour - task.startTime.hour) * 80.0) + ((task.endTime.minute - task.startTime.minute) * 80.0 / 60.0);
-                                    if (height < 30) height = 30;
-
-                                    return Positioned(
-                                      top: top,
-                                      left: (dayIdx * dayWidth) + 4,
-                                      width: dayWidth - 8,
-                                      child: GestureDetector(
-                                        onTap: () => _showTaskDialog(taskToEdit: task, initialDate: date),
-                                        child: Container(
-                                          height: height,
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
-                                          ),
-                                          child: SingleChildScrollView(
-                                            physics: const NeverScrollableScrollPhysics(),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                                if (height > 40)
-                                                  Text(DateFormat.Hm().format(task.startTime), style: const TextStyle(fontSize: 9)),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }),
-                                ],
-                              );
-                            }),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                            return Positioned(
+                              top: top,
+                              left: (dayIdx * dayWidth) + 4,
+                              width: dayWidth - 8,
+                              child: GestureDetector(
+                                onTap: () => _showTaskDialog(taskToEdit: task, initialDate: date),
+                                child: Container(
+                                  height: height,
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: task.isCompleted ? Colors.grey.withOpacity(0.3) : Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(task.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, decoration: task.isCompleted ? TextDecoration.lineThrough : null), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      if (height > 40) Text(DateFormat.Hm().format(task.startTime), style: const TextStyle(fontSize: 10)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
               ),
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showTaskDialog(),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

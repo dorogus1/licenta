@@ -140,14 +140,22 @@ void ProcessMonitor::ScanAndBlock() {
   }
   CloseHandle(hSnapshot);
 
-  // 2. Map PIDs to Visible Windows (optimization: enumerate once)
-  std::map<DWORD, HWND> pidToWindow;
+  // 2. Map PIDs to Largest Visible Windows
+  struct WindowArea { HWND hwnd; long area; };
+  std::map<DWORD, WindowArea> pidToWindow;
   EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL {
-    auto* map = (std::map<DWORD, HWND>*)lParam;
+    auto* map = (std::map<DWORD, WindowArea>*)lParam;
     DWORD wpid;
     GetWindowThreadProcessId(hwnd, &wpid);
-    if (IsWindowVisible(hwnd) && map->find(wpid) == map->end()) {
-      (*map)[wpid] = hwnd;
+    if (IsWindowVisible(hwnd)) {
+      RECT r;
+      GetWindowRect(hwnd, &r);
+      long area = (r.right - r.left) * (r.bottom - r.top);
+      if (area > 0) {
+        if (map->find(wpid) == map->end() || area > (*map)[wpid].area) {
+          (*map)[wpid] = {hwnd, area};
+        }
+      }
     }
     return TRUE;
   }, (LPARAM)&pidToWindow);
@@ -161,13 +169,9 @@ void ProcessMonitor::ScanAndBlock() {
       DWORD pid = kv.first;
       const auto& info = kv.second;
       
-      // If we don't have a visible window for this process, skip blocking it via overlay?
-      // Or should we block it anyway? The overlay needs a window. 
-      // If it's a background process, we can't show overlay over it.
-      // But maybe we want to close it? For now, we only support overlay.
       auto wit = pidToWindow.find(pid);
       if (wit == pidToWindow.end()) continue;
-      HWND hwnd = wit->second;
+      HWND hwnd = wit->second.hwnd;
 
       bool blocked = false;
 

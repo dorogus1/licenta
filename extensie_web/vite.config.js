@@ -17,7 +17,7 @@ export default defineConfig({
     })
   ],
   build: {
-    minify: false, // Disable minification for debugging
+    minify: true, // Enable minification for performance
     rollupOptions: {
       input: {
         popup: 'popup.html',

@@ -192,9 +192,16 @@ class AuthService {
     await prefs.remove('auth_token');
     await prefs.remove('auth_user_id');
     await prefs.remove('auth_email');
+    await prefs.remove('google_access_token');
     
-    final googleSignIn = GoogleSignIn();
-    await googleSignIn.signOut();
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        final googleSignIn = GoogleSignIn();
+        await googleSignIn.signOut();
+      } catch (e) {
+        debugPrint('GoogleSignIn signOut error: $e');
+      }
+    }
   }
 
   // --- HELPERS ---
