@@ -1,0 +1,76 @@
+{
+  "@@locale": "en",
+  "appTitle": "Focus Shield",
+  "blockApps": "Block Apps",
+  "searchApps": "Search apps...",
+  "suggestedToBlock": "Suggested to Block",
+  "allApps": "All Apps",
+  "avgUsage": "Avg usage: {duration}",
+  "@avgUsage": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "h": "h",
+  "mPerDay": "m/day",
+  "permissionRequired": "Permission Required",
+  "usageAccessContent": "To detect running apps, Focus App needs \"Usage Access\" permission.",
+  "displayOverAppsContent": "To block apps effectively, Focus App needs \"Display over other apps\" permission.",
+  "cancel": "Cancel",
+  "openSettings": "Open Settings",
+  "grant": "Grant",
+  "tasksCalendar": "Tasks & Calendar",
+  "settings": "Settings",
+  "focusing": "FOCUSING",
+  "ready": "READY",
+  "resetTimer": "RESET TIMER",
+  "todayTasks": "TODAY'S TASKS",
+  "viewAll": "VIEW ALL",
+  "noUpcomingTasks": "No upcoming tasks for today.",
+  "sessionFinished": "Session Finished!",
+  "achieveGoal": "Did you achieve your goal?",
+  "yesDone": "YES, DONE",
+  "extraTime": "EXTRA TIME",
+  "excellent": "Excellent! 🚀",
+  "howMuchExtra": "How much extra time?",
+  "min": "min",
+  "profile": "Profile",
+  "notLoggedIn": "Not logged in",
+  "deviceId": "Device ID: {id}",
+  "@deviceId": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "appearance": "Appearance",
+  "darkMode": "Dark Mode",
+  "language": "Language",
+  "activeDevices": "Active Devices",
+  "noOtherDevices": "No other active devices",
+  "you": "(You)",
+  "logout": "Logout",
+  "createAccount": "Create Account",
+  "welcomeBack": "Welcome Back",
+  "email": "Email",
+  "password": "Password",
+  "signIn": "Sign In",
+  "signUp": "Sign Up",
+  "signInGoogle": "Sign in with Google",
+  "alreadyHaveAccount": "Already have an account? Sign In",
+  "dontHaveAccount": "Don't have an account? Sign Up",
+  "success": "Success!",
+  "googleLoginSuccess": "You have successfully logged in with Google. Welcome!",
+  "getStarted": "Get Started",
+  "unexpectedError": "An unexpected error occurred: {error}",
+  "@unexpectedError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
+}

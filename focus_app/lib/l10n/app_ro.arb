@@ -1,0 +1,76 @@
+{
+  "@@locale": "ro",
+  "appTitle": "Scut Focus",
+  "blockApps": "Blocare Aplicații",
+  "searchApps": "Caută aplicații...",
+  "suggestedToBlock": "Sugerate pentru Blocare",
+  "allApps": "Toate Aplicațiile",
+  "avgUsage": "Utilizare medie: {duration}",
+  "@avgUsage": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "h": "h",
+  "mPerDay": "m/zi",
+  "permissionRequired": "Permisiune Necesară",
+  "usageAccessContent": "Pentru a detecta aplicațiile care rulează, Focus App are nevoie de permisiunea \"Acces la utilizare\".",
+  "displayOverAppsContent": "Pentru a bloca aplicațiile eficient, Focus App are nevoie de permisiunea \"Afișare peste alte aplicații\".",
+  "cancel": "Anulează",
+  "openSettings": "Deschide Setări",
+  "grant": "Acordă",
+  "tasksCalendar": "Sarcini și Calendar",
+  "settings": "Setări",
+  "focusing": "CONCENTRARE",
+  "ready": "GATA",
+  "resetTimer": "RESETARE CRONOMETRU",
+  "todayTasks": "SARCINILE DE AZI",
+  "viewAll": "VEZI TOT",
+  "noUpcomingTasks": "Nicio sarcină planificată pentru azi.",
+  "sessionFinished": "Sesiune Terminată!",
+  "achieveGoal": "Ai reușit să finalizezi ce ți-ai propus?",
+  "yesDone": "DA, GATA",
+  "extraTime": "EXTRA TIMP",
+  "excellent": "Excelent! 🚀",
+  "howMuchExtra": "Cât timp extra?",
+  "min": "min",
+  "profile": "Profil",
+  "notLoggedIn": "Nu ești autentificat",
+  "deviceId": "ID Dispozitiv: {id}",
+  "@deviceId": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "appearance": "Aspect",
+  "darkMode": "Mod Întunecat",
+  "language": "Limbă",
+  "activeDevices": "Dispozitive Active",
+  "noOtherDevices": "Niciun alt dispozitiv activ",
+  "you": "(Tu)",
+  "logout": "Deconectare",
+  "createAccount": "Crează Cont",
+  "welcomeBack": "Bine ai revenit",
+  "email": "Email",
+  "password": "Parolă",
+  "signIn": "Autentificare",
+  "signUp": "Înregistrare",
+  "signInGoogle": "Autentificare cu Google",
+  "alreadyHaveAccount": "Ai deja un cont? Autentifică-te",
+  "dontHaveAccount": "Nu ai cont? Înregistrează-te",
+  "success": "Succes!",
+  "googleLoginSuccess": "Te-ai autentificat cu succes folosind Google. Bine ai venit!",
+  "getStarted": "Începe",
+  "unexpectedError": "A apărut o eroare neașteptată: {error}",
+  "@unexpectedError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
+}

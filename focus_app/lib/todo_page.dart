@@ -71,6 +71,8 @@ class _TodoPageState extends State<TodoPage> {
   bool _isSyncing = false;
   bool _isWeekView = false;
   bool _showTimeline = true;
+  bool _showMonthView = false;
+  DateTime _monthViewDate = DateTime.now();
 
   // Check if current platform is desktop
   bool get _isDesktop => !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
@@ -79,6 +81,7 @@ class _TodoPageState extends State<TodoPage> {
   void initState() {
     super.initState();
     _loadTasks();
+    _monthViewDate = _selectedDate;
     _checkAndPerformAutoSync();
     
     _gridHorizontalController.addListener(() {
@@ -527,16 +530,19 @@ class _TodoPageState extends State<TodoPage> {
       appBar: AppBar(
         title: const Text('Task Tracker', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
-          IconButton(
-            icon: Icon(_showTimeline ? Icons.list : Icons.view_timeline),
-            tooltip: _showTimeline ? 'View List' : 'View Timeline',
-            onPressed: () => setState(() => _showTimeline = !_showTimeline),
-          ),
           if (_isDesktop)
             IconButton(
-              icon: Icon(isActualWeekView ? Icons.view_day : Icons.view_week),
-              onPressed: () => setState(() => _isWeekView = !_isWeekView),
+              icon: Icon(_showMonthView ? Icons.calendar_view_day : Icons.calendar_month),
+              tooltip: _showMonthView ? 'Back to Timeline' : 'Month View',
+              onPressed: () => setState(() => _showMonthView = !_showMonthView),
             ),
+          if (!_showMonthView) ...[
+            IconButton(
+              icon: Icon(_showTimeline ? Icons.list : Icons.view_timeline),
+              tooltip: _showTimeline ? 'View List' : 'View Timeline',
+              onPressed: () => setState(() => _showTimeline = !_showTimeline),
+            ),
+          ],
           if (_isSyncing)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
@@ -550,7 +556,7 @@ class _TodoPageState extends State<TodoPage> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Column(
+      body: _showMonthView && _isDesktop ? _buildMonthView() : Column(
         children: [
           // Quick Add Field
           Padding(
@@ -593,7 +599,10 @@ class _TodoPageState extends State<TodoPage> {
                         firstDate: DateTime.now().subtract(const Duration(days: 365)),
                         lastDate: DateTime.now().add(const Duration(days: 365)),
                       );
-                      if (picked != null) setState(() => _selectedDate = picked);
+                      if (picked != null) setState(() {
+                        _selectedDate = picked;
+                        _monthViewDate = picked;
+                      });
                     },
                     child: Text(
                       DateFormat('EEEE, d MMMM').format(_selectedDate),
@@ -617,6 +626,144 @@ class _TodoPageState extends State<TodoPage> {
         label: const Text('New Task'),
         icon: const Icon(Icons.add),
       ),
+    );
+  }
+
+  Widget _buildMonthView() {
+    return Row(
+      children: [
+        // Calendar Grid
+        Expanded(
+          flex: 3,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                _buildMonthHeader(),
+                const SizedBox(height: 20),
+                _buildWeekdayLabels(),
+                Expanded(child: _buildCalendarGrid()),
+              ],
+            ),
+          ),
+        ),
+        // Day Task List Sidebar
+        Container(
+          width: 350,
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: Colors.grey.withOpacity(0.2))),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('EEEE').format(_selectedDate).toUpperCase(),
+                      style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 12),
+                    ),
+                    Text(
+                      DateFormat('MMMM d, yyyy').format(_selectedDate),
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(child: _buildListView()),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMonthHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          DateFormat('MMMM yyyy').format(_monthViewDate),
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        Row(
+          children: [
+            IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => setState(() => _monthViewDate = DateTime(_monthViewDate.year, _monthViewDate.month - 1, 1))),
+            IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => setState(() => _monthViewDate = DateTime(_monthViewDate.year, _monthViewDate.month + 1, 1))),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWeekdayLabels() {
+    final labels = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: labels.map((l) => Expanded(
+          child: Center(child: Text(l, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+        )).toList(),
+      ),
+    );
+  }
+
+  Widget _buildCalendarGrid() {
+    final firstDayOfMonth = DateTime(_monthViewDate.year, _monthViewDate.month, 1);
+    final daysInMonth = DateTime(_monthViewDate.year, _monthViewDate.month + 1, 0).day;
+    int startOffset = firstDayOfMonth.weekday - 1;
+    
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 7,
+        childAspectRatio: 1.5,
+      ),
+      itemCount: 42,
+      itemBuilder: (context, index) {
+        final day = index - startOffset + 1;
+        if (day < 1 || day > daysInMonth) return Container();
+        
+        final date = DateTime(_monthViewDate.year, _monthViewDate.month, day);
+        final isSelected = _selectedDate.year == date.year && _selectedDate.month == date.month && _selectedDate.day == date.day;
+        final isToday = DateTime.now().year == date.year && DateTime.now().month == date.month && DateTime.now().day == date.day;
+
+        final hasTasks = _tasks.any((t) => 
+          t.startTime.year == date.year && t.startTime.month == date.month && t.startTime.day == date.day
+        );
+
+        return GestureDetector(
+          onTap: () => setState(() => _selectedDate = date),
+          child: Container(
+            margin: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.1) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : (isToday ? Theme.of(context).colorScheme.primary.withOpacity(0.5) : Colors.grey.withOpacity(0.1))),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  day.toString(),
+                  style: TextStyle(
+                    fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                  ),
+                ),
+                if (hasTasks)
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, shape: BoxShape.circle),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

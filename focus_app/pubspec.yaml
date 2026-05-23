@@ -46,7 +46,9 @@ dependencies:
   firebase_core: ^3.8.0
   app_links: ^6.3.2
   google_sign_in: ^6.2.1
-  intl: ^0.19.0
+  intl: 0.20.2
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
@@ -83,6 +85,7 @@ msix_config:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'dart:io' show Platform;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'l10n/app_localizations.dart';
 import 'auth_service.dart';
 import 'services/app_blocker_service.dart';
 import 'todo_page.dart';
@@ -15,6 +16,8 @@ import 'settings_page.dart';
 class HomePage extends StatefulWidget {
   final VoidCallback toggleTheme;
   final VoidCallback onLogout;
+  final Function(Locale) setLocale;
+  final Locale? currentLocale;
   final bool isDark;
   final AuthService authService;
 
@@ -24,6 +27,8 @@ class HomePage extends StatefulWidget {
     required this.isDark,
     required this.onLogout,
     required this.authService,
+    required this.setLocale,
+    required this.currentLocale,
   });
 
   @override
@@ -155,6 +160,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
   }
 
   void _showFeedbackDialog() {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       isDismissible: false,
@@ -171,9 +177,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
           children: [
             const Icon(Icons.celebration, size: 64, color: Colors.orangeAccent),
             const SizedBox(height: 24),
-            const Text('Sesiune Terminată!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(l10n.sessionFinished, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            const Text('Ai reușit să finalizezi ce ți-ai propus?', textAlign: TextAlign.center),
+            Text(l10n.achieveGoal, textAlign: TextAlign.center),
             const SizedBox(height: 32),
             Row(
               children: [
@@ -187,10 +193,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                     ),
                     onPressed: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Excelent! 🚀'), duration: const Duration(seconds: 2)));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.excellent), duration: const Duration(seconds: 2)));
                     },
                     icon: const Icon(Icons.check),
-                    label: const Text('DA, GATA'),
+                    label: Text(l10n.yesDone),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -205,7 +211,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                       _showExtraTimeDialog();
                     },
                     icon: const Icon(Icons.more_time),
-                    label: const Text('EXTRA TIMP'),
+                    label: Text(l10n.extraTime),
                   ),
                 ),
               ],
@@ -217,6 +223,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
   }
 
   void _showExtraTimeDialog() {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -229,7 +236,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Cât timp extra?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(l10n.howMuchExtra, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -247,6 +254,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
   }
 
   Widget _buildExtraTimeOption(int minutes, Color color) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         InkWell(
@@ -269,7 +277,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
           ),
         ),
         const SizedBox(height: 8),
-        const Text('min', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(l10n.min, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
   }
@@ -293,16 +301,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
   Widget build(BuildContext context) {
     double progress = timeLeft / totalTime;
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        title: const Text('Focus Shield', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(l10n.appTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_month),
-            tooltip: 'Tasks & Calendar',
+            tooltip: l10n.tasksCalendar,
             onPressed: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => TodoPage(authService: widget.authService)),
@@ -313,7 +322,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
           if (Platform.isWindows || Platform.isAndroid)
             IconButton(
               icon: const Icon(Icons.app_blocking),
-              tooltip: 'Blocked Apps',
+              tooltip: l10n.blockApps,
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => Platform.isWindows 
                   ? const WindowsAppsPage() 
@@ -322,13 +331,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
             ),
           IconButton(
             icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
+            tooltip: l10n.settings,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => SettingsPage(
                 authService: widget.authService,
                 isDark: widget.isDark,
                 onLogout: widget.onLogout,
                 toggleTheme: widget.toggleTheme,
+                setLocale: widget.setLocale,
+                currentLocale: widget.currentLocale,
               )),
             ),
           ),
@@ -388,7 +399,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          running ? 'FOCUSING' : 'READY',
+                          running ? l10n.focusing : l10n.ready,
                           style: TextStyle(
                             letterSpacing: 4,
                             fontSize: 14,
@@ -433,7 +444,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
               TextButton.icon(
                 onPressed: resetTimer,
                 icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('RESET TIMER'),
+                label: Text(l10n.resetTimer),
                 style: TextButton.styleFrom(
                   foregroundColor: colorScheme.onBackground.withOpacity(0.5),
                 ),
@@ -448,9 +459,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'TODAY\'S TASKS',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5, color: Colors.grey),
+                        Text(
+                          l10n.todayTasks,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5, color: Colors.grey),
                         ),
                         TextButton(
                           onPressed: () async {
@@ -459,14 +470,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                             );
                             _loadTodayTasks();
                           },
-                          child: const Text('VIEW ALL'),
+                          child: Text(l10n.viewAll),
                         ),
                       ],
                     ),
                     if (_todayTasks.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16.0),
-                        child: Text('No upcoming tasks for today.', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                        child: Text(l10n.noUpcomingTasks, style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
                       )
                     else
                       ..._todayTasks.take(3).map((task) => Card(

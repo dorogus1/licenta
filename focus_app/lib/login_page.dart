@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'l10n/app_localizations.dart';
 import 'auth_service.dart';
-import 'main.dart'; // For navigation context if needed, though main handles routing usually
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -27,6 +27,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -56,7 +57,7 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'An unexpected error occurred: $e';
+        _errorMessage = l10n.unexpectedError(e.toString());
       });
     } finally {
       if (mounted) {
@@ -69,6 +70,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       body: Center(
@@ -99,7 +101,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  _isRegistering ? 'Create Account' : 'Welcome Back',
+                  _isRegistering ? l10n.createAccount : l10n.welcomeBack,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 24,
@@ -127,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
                   controller: _emailController,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    labelText: 'Email',
+                    labelText: l10n.email,
                     prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
                     labelStyle: const TextStyle(color: Colors.grey),
                     enabledBorder: OutlineInputBorder(
@@ -146,7 +148,7 @@ class _LoginPageState extends State<LoginPage> {
                   obscureText: true,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: l10n.password,
                     prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
                     labelStyle: const TextStyle(color: Colors.grey),
                     enabledBorder: OutlineInputBorder(
@@ -180,7 +182,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         )
                       : Text(
-                          _isRegistering ? 'Sign Up' : 'Sign In',
+                          _isRegistering ? l10n.signUp : l10n.signIn,
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                 ),
@@ -209,15 +211,15 @@ class _LoginPageState extends State<LoginPage> {
                                backgroundColor: const Color(0xFF1E1E1E),
                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                title: Row(
-                                 children: const [
-                                   Icon(Icons.check_circle, color: Colors.greenAccent),
-                                   SizedBox(width: 12),
-                                   Text('Succes!', style: TextStyle(color: Colors.white)),
+                                 children: [
+                                   const Icon(Icons.check_circle, color: Colors.greenAccent),
+                                   const SizedBox(width: 12),
+                                   Text(l10n.success, style: const TextStyle(color: Colors.white)),
                                  ],
                                ),
-                               content: const Text(
-                                 'Te-ai autentificat cu succes folosind Google. Bine ai venit!',
-                                 style: TextStyle(color: Colors.white70),
+                               content: Text(
+                                 l10n.googleLoginSuccess,
+                                 style: const TextStyle(color: Colors.white70),
                                ),
                                actions: [
                                  TextButton(
@@ -225,7 +227,7 @@ class _LoginPageState extends State<LoginPage> {
                                      Navigator.pop(ctx);
                                      widget.onLoginSuccess();
                                    },
-                                   child: Text('Incepe', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
+                                   child: Text(l10n.getStarted, style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
                                  ),
                                ],
                              ),
@@ -239,7 +241,7 @@ class _LoginPageState extends State<LoginPage> {
                     }
                   },
                   icon: const Icon(Icons.g_mobiledata, size: 28), // Or a custom Google logo asset
-                  label: const Text('Sign in with Google'),
+                  label: Text(l10n.signInGoogle),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     side: const BorderSide(color: Colors.grey),
@@ -259,8 +261,8 @@ class _LoginPageState extends State<LoginPage> {
                   },
                   child: Text(
                     _isRegistering
-                        ? 'Already have an account? Sign In'
-                        : "Don't have an account? Sign Up",
+                        ? l10n.alreadyHaveAccount
+                        : l10n.dontHaveAccount,
                     style: const TextStyle(color: Colors.grey),
                   ),
                 ),
@@ -272,4 +274,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

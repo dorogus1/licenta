@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
 import 'home_page.dart';
 import 'login_page.dart';
 import 'auth_service.dart';
@@ -17,6 +19,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.dark;
+  Locale? _locale;
   bool _isLoggedIn = false;
   bool _isLoadingAuth = true;
   final AuthService _authService = AuthService();
@@ -59,6 +62,12 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  void setLocale(Locale locale) {
+    setState(() {
+      _locale = locale;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoadingAuth) {
@@ -73,9 +82,20 @@ class _MyAppState extends State<MyApp> {
 
     return MaterialApp(
       navigatorKey: _navigatorKey,
-      title: 'Focus Shield',
+      onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
+      locale: _locale,
+      localizationsDelegates: [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('ro'),
+      ],
       theme: ThemeData.light().copyWith(
         scaffoldBackgroundColor: const Color(0xFFF5F5F5),
         colorScheme: const ColorScheme.light(
@@ -99,7 +119,9 @@ class _MyAppState extends State<MyApp> {
               toggleTheme: toggleTheme, 
               isDark: _themeMode == ThemeMode.dark, 
               onLogout: _onLogout, 
-              authService: _authService
+              authService: _authService,
+              setLocale: setLocale,
+              currentLocale: _locale,
             )
           : LoginPage(onLoginSuccess: _onLoginSuccess, authService: _authService),
     );

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'l10n/app_localizations.dart';
 import 'auth_service.dart';
 
 class SettingsPage extends StatefulWidget {
   final AuthService authService;
   final VoidCallback onLogout;
   final VoidCallback toggleTheme;
+  final Function(Locale) setLocale;
+  final Locale? currentLocale;
   final bool isDark;
 
   const SettingsPage({
@@ -14,6 +17,8 @@ class SettingsPage extends StatefulWidget {
     required this.onLogout,
     required this.toggleTheme,
     required this.isDark,
+    required this.setLocale,
+    required this.currentLocale,
   });
 
   @override
@@ -58,37 +63,59 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(l10n.settings, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildSectionHeader('Profile'),
+          _buildSectionHeader(l10n.profile),
           Card(
             child: ListTile(
               leading: const CircleAvatar(child: Icon(Icons.person)),
-              title: Text(email ?? 'Not logged in'),
-              subtitle: Text('Device ID: ${currentDeviceId ?? 'Unknown'}'),
+              title: Text(email ?? l10n.notLoggedIn),
+              subtitle: Text(l10n.deviceId(currentDeviceId ?? 'Unknown')),
             ),
           ),
           const SizedBox(height: 24),
-          _buildSectionHeader('Appearance'),
+          _buildSectionHeader(l10n.appearance),
           Card(
-            child: SwitchListTile(
-              secondary: Icon(widget.isDark ? Icons.dark_mode : Icons.light_mode),
-              title: const Text('Dark Mode'),
-              value: widget.isDark,
-              onChanged: (_) => widget.toggleTheme(),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: Icon(widget.isDark ? Icons.dark_mode : Icons.light_mode),
+                  title: Text(l10n.darkMode),
+                  value: widget.isDark,
+                  onChanged: (_) => widget.toggleTheme(),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.language),
+                  title: Text(l10n.language),
+                  trailing: DropdownButton<String>(
+                    value: widget.currentLocale?.languageCode ?? 'en',
+                    items: const [
+                      DropdownMenuItem(value: 'en', child: Text('English')),
+                      DropdownMenuItem(value: 'ro', child: Text('Română')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        widget.setLocale(Locale(val));
+                      }
+                    },
+                    underline: Container(),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
-          _buildSectionHeader('Active Devices'),
+          _buildSectionHeader(l10n.activeDevices),
           _loading 
             ? const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
             : devices.isEmpty 
-              ? const Card(child: ListTile(title: Text('No other active devices')))
+              ? Card(child: ListTile(title: Text(l10n.noOtherDevices)))
               : Column(
                   children: devices.entries.map((entry) {
                     final id = entry.key;
@@ -113,7 +140,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     return Card(
                       child: ListTile(
                         leading: Icon(icon, color: isMe ? Theme.of(context).colorScheme.primary : null),
-                        title: Text('$name ${isMe ? '(You)' : ''}'),
+                        title: Text('$name ${isMe ? l10n.you : ''}'),
                         subtitle: Text(platform),
                         trailing: Icon(
                           Icons.circle,
@@ -135,7 +162,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             onPressed: widget.onLogout,
             icon: const Icon(Icons.logout),
-            label: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: Text(l10n.logout, style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
