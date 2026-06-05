@@ -5,12 +5,15 @@ import 'package:flutter/material.dart';
 import 'dart:io' show Platform;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter/services.dart';
 import 'l10n/app_localizations.dart';
 import 'auth_service.dart';
 import 'services/app_blocker_service.dart';
 import 'todo_page.dart';
 import 'mobile_apps_page.dart';
 import 'windows_apps_page.dart';
+import 'windows_process_monitor.dart';
 import 'settings_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -42,7 +45,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
   Timer? _timer;
   bool running = false;
   late AnimationController _pulseController;
+  static const _killerChannel = MethodChannel('com.example.focus_app/app_killer');
   StreamSubscription? _sessionSubscription;
+  StreamSubscription? _blockedAppSubscription;
+  StreamSubscription? _windowsBlockedSubscription;
   List<TodoTask> _todayTasks = [];
 
   @override
@@ -81,6 +87,51 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
         }
       }
     });
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      _blockedAppSubscription = FlutterBackgroundService().on("blockedAppDetected").listen((event) {
+        if (event != null && event["packageName"] != null) {
+          _handleBlockedApp(event["packageName"]);
+        }
+      });
+    }
+
+    if (Platform.isWindows) {
+      _windowsBlockedSubscription = WindowsProcessMonitor.onBlocked.listen((process) {
+        _handleBlockedApp(process.name);
+      });
+    }
+  }
+
+  Future<void> _handleBlockedApp(String packageName) async {
+    // Try to kill the process
+    try {
+      if (Platform.isAndroid) {
+        await _killerChannel.invokeMethod('killProcess', {'packageName': packageName});
+      }
+    } catch (e) {
+      debugPrint("Failed to kill process: $e");
+    }
+
+    if (mounted) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.block, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(child: Text(l10n.appBlocked)),
+            ],
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   Future<void> _loadTodayTasks() async {
@@ -106,6 +157,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _sessionSubscription?.cancel();
+    _blockedAppSubscription?.cancel();
+    _windowsBlockedSubscription?.cancel();
     _pulseController.dispose();
     _timer?.cancel();
     super.dispose();

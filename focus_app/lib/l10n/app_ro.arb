@@ -72,5 +72,7 @@
         "type": "String"
       }
     }
-  }
+  },
+  "appBlocked": "Această aplicație este blocată în timpul sesiunii de focus.",
+  "appBlockedTitle": "Aplicație Blocată"
 }

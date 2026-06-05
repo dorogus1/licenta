@@ -409,6 +409,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'An unexpected error occurred: {error}'**
   String unexpectedError(String error);
+
+  /// No description provided for @appBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'The app is blocked during focus sessions.'**
+  String get appBlocked;
+
+  /// No description provided for @appBlockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Blocked'**
+  String get appBlockedTitle;
 }
 
 class _AppLocalizationsDelegate

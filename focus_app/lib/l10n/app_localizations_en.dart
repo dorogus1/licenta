@@ -172,4 +172,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String unexpectedError(String error) {
     return 'An unexpected error occurred: $error';
   }
+
+  @override
+  String get appBlocked => 'The app is blocked during focus sessions.';
+
+  @override
+  String get appBlockedTitle => 'App Blocked';
 }

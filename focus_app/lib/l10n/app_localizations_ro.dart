@@ -172,4 +172,11 @@ class AppLocalizationsRo extends AppLocalizations {
   String unexpectedError(String error) {
     return 'A apărut o eroare neașteptată: $error';
   }
+
+  @override
+  String get appBlocked =>
+      'Această aplicație este blocată în timpul sesiunii de focus.';
+
+  @override
+  String get appBlockedTitle => 'Aplicație Blocată';
 }

@@ -72,5 +72,7 @@
         "type": "String"
       }
     }
-  }
+  },
+  "appBlocked": "The app is blocked during focus sessions.",
+  "appBlockedTitle": "App Blocked"
 }
