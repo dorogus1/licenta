@@ -132,8 +132,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     final isOnline = (state != 'offline') && ((now - lastSeen) < 90000);
 
                     IconData icon;
-                    if (type == 'extension') icon = Icons.language;
-                    else if (type == 'windows') icon = Icons.laptop_windows;
+                    if (type == 'extension') {
+                      icon = Icons.language;
+                    } else if (type == 'windows') icon = Icons.laptop_windows;
                     else if (type == 'mobile') icon = Icons.smartphone;
                     else icon = Icons.devices;
 
@@ -154,7 +155,7 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 32),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.withOpacity(0.1),
+              backgroundColor: Colors.red.withValues(alpha: 0.1),
               foregroundColor: Colors.red,
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 16),

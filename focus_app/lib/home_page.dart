@@ -320,7 +320,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
             width: 70,
             height: 70,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
               border: Border.all(color: color, width: 2),
             ),
@@ -426,9 +426,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                     child: CircularProgressIndicator(
                       value: progress,
                       strokeWidth: 15,
-                      backgroundColor: colorScheme.surfaceVariant,
+                      backgroundColor: colorScheme.surfaceContainerHighest,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        running ? colorScheme.secondary : colorScheme.primary.withOpacity(0.3),
+                        running ? colorScheme.secondary : colorScheme.primary.withValues(alpha: 0.3),
                       ),
                       strokeCap: StrokeCap.round,
                     ),
@@ -448,7 +448,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         decoration: BoxDecoration(
-                          color: running ? colorScheme.secondary.withOpacity(0.1) : Colors.transparent,
+                          color: running ? colorScheme.secondary.withValues(alpha: 0.1) : Colors.transparent,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -456,7 +456,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                           style: TextStyle(
                             letterSpacing: 4,
                             fontSize: 14,
-                            color: running ? colorScheme.secondary : colorScheme.onBackground.withOpacity(0.4),
+                            color: running ? colorScheme.secondary : colorScheme.onSurface.withValues(alpha: 0.4),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -499,7 +499,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                 icon: const Icon(Icons.refresh, size: 18),
                 label: Text(l10n.resetTimer),
                 style: TextButton.styleFrom(
-                  foregroundColor: colorScheme.onBackground.withOpacity(0.5),
+                  foregroundColor: colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
               const SizedBox(height: 40),
@@ -557,7 +557,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         shape: BoxShape.circle,
-        border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.1)),
+        border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: IconButton(
         icon: Icon(icon),

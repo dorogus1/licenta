@@ -217,17 +217,52 @@ export async function mountAuth() {
   googleLoginBtn && googleLoginBtn.addEventListener('click', () => {
       loginError.textContent = 'Contacting Google...';
       
-      chrome.identity.getAuthToken({ interactive: true }, async (token) => {
-          if (chrome.runtime.lastError || !token) {
-              console.error(chrome.runtime.lastError);
+      const clientId = '1024855875521-8ajkijhu9qoo37o03aifarf7739soem7.apps.googleusercontent.com';
+      const redirectUri = chrome.identity.getRedirectURL();
+      const scopes = [
+          'https://www.googleapis.com/auth/calendar',
+          'https://www.googleapis.com/auth/userinfo.email',
+          'https://www.googleapis.com/auth/userinfo.profile'
+      ].join(' ');
+      
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+          `client_id=${clientId}` +
+          `&response_type=token` +
+          `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+          `&scope=${encodeURIComponent(scopes)}`;
+
+      chrome.identity.launchWebAuthFlow({
+          url: authUrl,
+          interactive: true
+      }, async (responseUrl) => {
+          if (chrome.runtime.lastError || !responseUrl) {
+              console.error('[auth] launchWebAuthFlow error:', chrome.runtime.lastError);
               loginError.textContent = 'Google Sign-In cancelled or failed.';
               return;
           }
 
           loginError.textContent = 'Signing in to Focus Shield...';
-          console.log('[auth] Google token obtained, attempt Firebase sign-in');
+          console.log('[auth] Google token obtained via launchWebAuthFlow, attempt Firebase sign-in');
           
           try {
+              const url = new URL(responseUrl);
+              const params = new URLSearchParams(url.hash.substring(1));
+              const token = params.get('access_token');
+              const expiresIn = parseInt(params.get('expires_in') || '3600', 10);
+
+              if (!token) {
+                  throw new Error('Access token not found in Google response.');
+              }
+
+              // Store token in local storage for fallback/calendar use
+              const expiryTime = Date.now() + (expiresIn * 1000);
+              await new Promise((resolve) => {
+                  chrome.storage.local.set({
+                      google_access_token: token,
+                      google_token_expiry: expiryTime
+                  }, resolve);
+              });
+
               const credential = GoogleAuthProvider.credential(null, token);
               const userCredential = await signInWithCredential(auth, credential);
               console.log('[auth] Firebase sign-in success:', userCredential.user.email);

@@ -103,7 +103,6 @@ class _MyAppState extends State<MyApp> {
           secondary: Color(0xFF03DAC6),
           surface: Colors.white,
         ),
-        useMaterial3: true,
       ),
       darkTheme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF121212),
@@ -112,7 +111,6 @@ class _MyAppState extends State<MyApp> {
           secondary: Color(0xFF03DAC6),
           surface: Color(0xFF1E1E1E),
         ),
-        useMaterial3: true,
       ),
       home: _isLoggedIn 
           ? HomePage(

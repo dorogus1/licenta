@@ -547,11 +547,18 @@ if (nextDayBtn) nextDayBtn.addEventListener('click', () => changeDate(1));
 
 async function getCalendarToken() {
     return new Promise((resolve) => {
-        chrome.identity.getAuthToken({ interactive: false }, (token) => {
-            if (chrome.runtime.lastError || !token) {
-                resolve(null);
+        chrome.storage.local.get(['google_access_token', 'google_token_expiry'], (result) => {
+            const now = Date.now();
+            if (result.google_access_token && result.google_token_expiry && now < result.google_token_expiry) {
+                resolve(result.google_access_token);
             } else {
-                resolve(token);
+                chrome.identity.getAuthToken({ interactive: false }, (token) => {
+                    if (chrome.runtime.lastError || !token) {
+                        resolve(null);
+                    } else {
+                        resolve(token);
+                    }
+                });
             }
         });
     });
@@ -728,12 +735,22 @@ const btnConnectCalendar = document.getElementById('btnConnectCalendar');
 
 function updateCalendarButtonState() {
     if (!btnConnectCalendar) return;
-    chrome.identity.getAuthToken({ interactive: false }, (token) => {
-        if (!chrome.runtime.lastError && token) {
+    chrome.storage.local.get(['google_access_token', 'google_token_expiry'], (result) => {
+        const now = Date.now();
+        if (result.google_access_token && result.google_token_expiry && now < result.google_token_expiry) {
             btnConnectCalendar.textContent = "Calendar Connected ✓";
             btnConnectCalendar.disabled = true;
             btnConnectCalendar.style.backgroundColor = "#4caf50";
             btnConnectCalendar.style.borderColor = "#4caf50";
+        } else {
+            chrome.identity.getAuthToken({ interactive: false }, (token) => {
+                if (!chrome.runtime.lastError && token) {
+                    btnConnectCalendar.textContent = "Calendar Connected ✓";
+                    btnConnectCalendar.disabled = true;
+                    btnConnectCalendar.style.backgroundColor = "#4caf50";
+                    btnConnectCalendar.style.borderColor = "#4caf50";
+                }
+            });
         }
     });
 }
@@ -743,19 +760,69 @@ if (btnConnectCalendar) {
 
     btnConnectCalendar.addEventListener('click', () => {
         btnConnectCalendar.textContent = "Connecting...";
-        chrome.identity.getAuthToken({ interactive: true }, (token) => {
-            if (chrome.runtime.lastError || !token) {
-                console.error(chrome.runtime.lastError);
-                btnConnectCalendar.textContent = "Connection Failed. Try again.";
-                setTimeout(() => {
-                    btnConnectCalendar.textContent = "Connect Google Calendar";
-                }, 2000);
+        
+        const clientId = '1024855875521-8ajkijhu9qoo37o03aifarf7739soem7.apps.googleusercontent.com';
+        const redirectUri = chrome.identity.getRedirectURL();
+        const scopes = [
+            'https://www.googleapis.com/auth/calendar',
+            'https://www.googleapis.com/auth/userinfo.email',
+            'https://www.googleapis.com/auth/userinfo.profile'
+        ].join(' ');
+
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+            `client_id=${clientId}` +
+            `&response_type=token` +
+            `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+            `&scope=${encodeURIComponent(scopes)}`;
+
+        chrome.identity.launchWebAuthFlow({
+            url: authUrl,
+            interactive: true
+        }, (responseUrl) => {
+            if (chrome.runtime.lastError || !responseUrl) {
+                console.error('[calendar] launchWebAuthFlow error:', chrome.runtime.lastError);
+                // Fallback to getAuthToken
+                chrome.identity.getAuthToken({ interactive: true }, (token) => {
+                    if (chrome.runtime.lastError || !token) {
+                        btnConnectCalendar.textContent = "Connection Failed. Try again.";
+                        setTimeout(() => {
+                            btnConnectCalendar.textContent = "Connect Google Calendar";
+                        }, 2000);
+                    } else {
+                        updateCalendarButtonState();
+                        chrome.alarms.create("checkCalendar", { when: Date.now() + 1000 });
+                    }
+                });
             } else {
-                console.log("Calendar token obtained:", token);
-                updateCalendarButtonState();
-                
-                // Trigger an immediate check
-                chrome.alarms.create("checkCalendar", { when: Date.now() + 1000 });
+                try {
+                    const url = new URL(responseUrl);
+                    const params = new URLSearchParams(url.hash.substring(1));
+                    const token = params.get('access_token');
+                    const expiresIn = parseInt(params.get('expires_in') || '3600', 10);
+                    
+                    if (token) {
+                        const expiryTime = Date.now() + (expiresIn * 1000);
+                        chrome.storage.local.set({
+                            google_access_token: token,
+                            google_token_expiry: expiryTime
+                        }, () => {
+                            console.log("Calendar token obtained via launchWebAuthFlow:", token);
+                            updateCalendarButtonState();
+                            chrome.alarms.create("checkCalendar", { when: Date.now() + 1000 });
+                        });
+                    } else {
+                        btnConnectCalendar.textContent = "Connection Failed. Try again.";
+                        setTimeout(() => {
+                            btnConnectCalendar.textContent = "Connect Google Calendar";
+                        }, 2000);
+                    }
+                } catch (e) {
+                    console.error("Error parsing responseUrl:", e);
+                    btnConnectCalendar.textContent = "Connection Failed. Try again.";
+                    setTimeout(() => {
+                        btnConnectCalendar.textContent = "Connect Google Calendar";
+                    }, 2000);
+                }
             }
         });
     });

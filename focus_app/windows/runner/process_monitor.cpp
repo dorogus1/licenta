@@ -7,6 +7,7 @@
 #include <vector>
 #include <sstream>
 #include <map>
+#include <chrono>
 
 static ProcessMonitor* g_instance = nullptr; // single-instance helper for WinEvent hook
 
@@ -216,7 +217,18 @@ void ProcessMonitor::ScanAndBlock() {
 
 void ProcessMonitor::MonitorLoop() {
   while (running_) {
+    auto start_time = std::chrono::high_resolution_clock::now();
     ScanAndBlock();
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+    
+    static int cycle_count = 0;
+    if (cycle_count++ % 10 == 0) {
+      std::ostringstream oss;
+      oss << "[PERFORMANCE] Process ScanAndBlock execution time: " << elapsed_time << " microseconds\n";
+      OutputDebugStringA(oss.str().c_str());
+    }
+
     ::Sleep(1000);
   }
 }

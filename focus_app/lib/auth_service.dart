@@ -237,6 +237,15 @@ class AuthService {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200 && response.body != 'null') {
         final data = json.decode(response.body);
+        
+        // Log latency for performance verification (Chapter 5)
+        if (data['lastUpdatedAt'] != null) {
+          final int lastUpdated = data['lastUpdatedAt'];
+          final int now = DateTime.now().millisecondsSinceEpoch;
+          final int latency = now - lastUpdated;
+          debugPrint('[PERFORMANCE] Focus session sync latency: $latency ms (updated by ${data['updatedBy']})');
+        }
+
         _sessionStreamController.add(SessionUpdate(
           isActive: data['isActive'] ?? false,
           endTime: data['endTime'],

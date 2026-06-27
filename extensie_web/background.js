@@ -129,6 +129,11 @@ function setupPresence(user) {
                 const session = snapshot.val();
                 console.log('[background] Syncing session to storage:', session);
                 
+                if (session && session.lastUpdatedAt) {
+                    const latency = Date.now() - session.lastUpdatedAt;
+                    console.log(`[PERFORMANCE] Focus session sync latency: ${latency} ms (updated by ${session.updatedBy})`);
+                }
+                
                 chrome.storage.local.get(['focus_deviceId'], (localData) => {
                     const myDeviceId = localData.focus_deviceId;
                     const updatedByMe = session && (session.updatedBy === 'extension' || session.updatedBy === myDeviceId || session.updatedBy === 'extension_calendar');
@@ -317,10 +322,13 @@ function updateBlockRules() {
             console.log('[background] Updating block rules with:', rules);
             chrome.declarativeNetRequest.getDynamicRules(oldRules => {
                 const oldIds = oldRules.map(r => r.id);
+                const t0 = performance.now();
                 chrome.declarativeNetRequest.updateDynamicRules({
                     removeRuleIds: oldIds,
                     addRules: rules
                 }, () => {
+                    const t1 = performance.now();
+                    console.log(`[PERFORMANCE] declarativeNetRequest updateDynamicRules took ${(t1 - t0).toFixed(2)} ms`);
                     // After rules are updated, immediately redirect any already-open tabs that match blocked sites
                     chrome.tabs.query({}, (tabs) => {
                         tabs.forEach(tab => {
@@ -346,7 +354,11 @@ function updateBlockRules() {
         } else {
             chrome.declarativeNetRequest.getDynamicRules(oldRules => {
                 const oldIds = oldRules.map(r => r.id);
-                chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: oldIds });
+                const t0 = performance.now();
+                chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: oldIds }, () => {
+                    const t1 = performance.now();
+                    console.log(`[PERFORMANCE] declarativeNetRequest removeRules took ${(t1 - t0).toFixed(2)} ms`);
+                });
             });
         }
     });
@@ -400,16 +412,28 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 async function checkCalendarEvents() {
     try {
-        // Get OAuth token silently
-        const token = await new Promise((resolve, reject) => {
-            chrome.identity.getAuthToken({ interactive: false }, (token) => {
-                if (chrome.runtime.lastError || !token) {
-                    reject(chrome.runtime.lastError);
+        // Get OAuth token silently, checking storage first, then falling back to identity
+        const token = await new Promise((resolve) => {
+            chrome.storage.local.get(['google_access_token', 'google_token_expiry'], (result) => {
+                const now = Date.now();
+                if (result.google_access_token && result.google_token_expiry && now < result.google_token_expiry) {
+                    resolve(result.google_access_token);
                 } else {
-                    resolve(token);
+                    chrome.identity.getAuthToken({ interactive: false }, (t) => {
+                        if (chrome.runtime.lastError || !t) {
+                            resolve(null);
+                        } else {
+                            resolve(t);
+                        }
+                    });
                 }
             });
         });
+
+        if (!token) {
+            console.log("[background] No valid Google token found for calendar check.");
+            return;
+        }
 
         const now = new Date();
         const nextMinute = new Date(now.getTime() + 60000); 

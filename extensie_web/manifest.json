@@ -22,7 +22,7 @@
     "https://focus-shild-default-rtdb.europe-west1.firebasedatabase.app/*"
   ],
   "oauth2": {
-    "client_id": "1024855875521-qubp0pi9oe9r7ai2jq9c1s835i0urinq.apps.googleusercontent.com",
+    "client_id": "1024855875521-8ajkijhu9qoo37o03aifarf7739soem7.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/calendar",
       "https://www.googleapis.com/auth/userinfo.email",
@@ -43,11 +43,16 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["blocked.html"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "blocked.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebaseio.com wss://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com"
-  }
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsWFZqN+mMsMVNcvc/LZNcu8MFPh2SCMhMsjJKopZI8vywjFIdAc8pmyL8Xi5l/BV5wflSmRcN+PfFF6kQ6/RHE8RMMFpkD816M2+4auIj06yIG1aBolVI7PT3BoYxouQTCaWhSGdgK/hPOR4mdwk1+74C3tQ1/BEC0+oCPfhTWI1kYDP09IfLXckOq8h/eZXcoHhRHYx8pQyskt9unLEebRgwQkKRrqjmk2GMn0EY5hX24XmYhRb5SIyfHRBY6qag9UC8Ec2KIPQ1WihMxi1d879PLFnGB6f8XAhpvg8w//UNZeTjeU1IwG6NVcj0fo+hWJI58nSm6OmanC4cpN6YwIDAQAB"
 }

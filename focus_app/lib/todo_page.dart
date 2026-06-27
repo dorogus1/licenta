@@ -69,7 +69,7 @@ class _TodoPageState extends State<TodoPage> {
   
   Timer? _nowTimer;
   bool _isSyncing = false;
-  bool _isWeekView = false;
+  final bool _isWeekView = false;
   bool _showTimeline = true;
   bool _showMonthView = false;
   DateTime _monthViewDate = DateTime.now();
@@ -373,7 +373,7 @@ class _TodoPageState extends State<TodoPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -403,7 +403,7 @@ class _TodoPageState extends State<TodoPage> {
                 style: const TextStyle(fontSize: 18),
                 decoration: InputDecoration(
                   hintText: 'Ce vrei să realizezi?',
-                  hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
+                  hintStyle: TextStyle(color: Colors.grey.withValues(alpha: 0.5)),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   prefixIcon: const Icon(Icons.task_alt),
                 ),
@@ -425,7 +425,7 @@ class _TodoPageState extends State<TodoPage> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surfaceVariant,
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(startTime.format(context), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -449,7 +449,7 @@ class _TodoPageState extends State<TodoPage> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surfaceVariant,
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(endTime.format(context), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -571,7 +571,7 @@ class _TodoPageState extends State<TodoPage> {
                       prefixIcon: const Icon(Icons.add),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                       filled: true,
-                      fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                     ),
                     onSubmitted: _quickAddTask,
                   ),
@@ -599,10 +599,12 @@ class _TodoPageState extends State<TodoPage> {
                         firstDate: DateTime.now().subtract(const Duration(days: 365)),
                         lastDate: DateTime.now().add(const Duration(days: 365)),
                       );
-                      if (picked != null) setState(() {
+                      if (picked != null) {
+                        setState(() {
                         _selectedDate = picked;
                         _monthViewDate = picked;
                       });
+                      }
                     },
                     child: Text(
                       DateFormat('EEEE, d MMMM').format(_selectedDate),
@@ -651,7 +653,7 @@ class _TodoPageState extends State<TodoPage> {
         Container(
           width: 350,
           decoration: BoxDecoration(
-            border: Border(left: BorderSide(color: Colors.grey.withOpacity(0.2))),
+            border: Border(left: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -738,9 +740,9 @@ class _TodoPageState extends State<TodoPage> {
           child: Container(
             margin: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.1) : Colors.transparent,
+              color: isSelected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1) : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : (isToday ? Theme.of(context).colorScheme.primary.withOpacity(0.5) : Colors.grey.withOpacity(0.1))),
+              border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : (isToday ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.5) : Colors.grey.withValues(alpha: 0.1))),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -807,7 +809,7 @@ class _TodoPageState extends State<TodoPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
+          SizedBox(
             width: 60,
             child: Column(
               children: List.generate(24, (hour) => Container(
@@ -822,18 +824,18 @@ class _TodoPageState extends State<TodoPage> {
             child: SingleChildScrollView(
               controller: _gridHorizontalController,
               scrollDirection: Axis.horizontal,
-              child: Container(
+              child: SizedBox(
                 width: totalWidth,
                 height: 24 * 80.0,
                 child: Stack(
                   children: [
                     Row(
-                      children: List.generate(isActualWeekView ? 7 : 1, (dayIdx) => Container(
+                      children: List.generate(isActualWeekView ? 7 : 1, (dayIdx) => SizedBox(
                         width: dayWidth,
                         child: Column(
                           children: List.generate(24, (h) => Container(
                             height: 80,
-                            decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey.withOpacity(0.1)), bottom: BorderSide(color: Colors.grey.withOpacity(0.1)))),
+                            decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey.withValues(alpha: 0.1)), bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.1)))),
                           )),
                         ),
                       )),
@@ -854,7 +856,7 @@ class _TodoPageState extends State<TodoPage> {
                               top: (now.hour * 80.0) + (now.minute * 80.0 / 60.0),
                               left: dayIdx * dayWidth,
                               width: dayWidth,
-                              child: Row(children: [Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)), Expanded(child: Container(height: 2, color: Colors.red.withOpacity(0.5)))]),
+                              child: Row(children: [Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)), Expanded(child: Container(height: 2, color: Colors.red.withValues(alpha: 0.5)))]),
                             ),
                           ...dayTasks.map((task) {
                             double top = (task.startTime.hour * 80.0) + (task.startTime.minute * 80.0 / 60.0);
@@ -871,9 +873,9 @@ class _TodoPageState extends State<TodoPage> {
                                   height: height,
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: task.isCompleted ? Colors.grey.withOpacity(0.3) : Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
+                                    color: task.isCompleted ? Colors.grey.withValues(alpha: 0.3) : Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.8),
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+                                    border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)),
                                   ),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,

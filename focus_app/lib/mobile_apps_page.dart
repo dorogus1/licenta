@@ -242,7 +242,7 @@ class _MobileAppsPageState extends State<MobileAppsPage> {
     final shouldHighlight = !isBlocked && (app.averageUsageMs ?? 0) >= highlightThreshold && !isSuggested;
 
     return Container(
-      color: shouldHighlight ? Colors.orangeAccent.withOpacity(0.05) : null,
+      color: shouldHighlight ? Colors.orangeAccent.withValues(alpha: 0.05) : null,
       child: ListTile(
         leading: app.icon != null && app.icon is Uint8List 
           ? Image.memory(app.icon as Uint8List, width: 40, height: 40)
