@@ -1,113 +1,113 @@
 # Focus Shield Sync
 
-Focus Shield Sync is a comprehensive productivity ecosystem designed to help you maintain focus by minimizing digital distractions. It consists of a cross-platform mobile/desktop application and a browser extension, both synchronized via the cloud to ensure your focus rules apply everywhere.
+Focus Shield Sync este un ecosistem complex de productivitate conceput pentru a te ajuta sa iti mentii concentrarea minimizand distragerile digitale. Este compus dintr-o aplicatie cross-platform pentru mobil/desktop si o extensie de browser, ambele sincronizate prin cloud pentru a se asigura ca regulile tale de concentrare se aplica peste tot.
 
-## 🚀 Ghid de Instalare (Installation Guide)
+## Ghid de Instalare
 
-### 📱 Android (APK)
-Pentru a instala aplicația pe dispozitivul tău Android:
-1. Descarcă fișierul `app-release.apk` din acest folder.
-2. Transferă-l pe telefon (sau descarcă-l direct pe dispozitiv).
-3. Deschide fișierul pe telefon. Dacă sistemul te întreabă, permite "Instalarea din surse necunoscute" (Unknown Sources) din setările browserului sau managerului de fișiere.
-4. Apasă pe **Install** și apoi deschide aplicația.
+### Android (APK)
+Pentru a instala aplicatia pe dispozitivul tau Android:
+1. Descarca fisierul `app-release.apk` din acest folder.
+2. Transfera-l pe telefon (sau descarca-l direct pe dispozitiv).
+3. Deschide fisierul pe telefon. Daca sistemul te intreaba, permite "Instalarea din surse necunoscute" (Unknown Sources) din setarile browserului sau managerului de fisiere.
+4. Apasa pe **Install** si apoi deschide aplicatia.
 
-### 💻 Windows (Desktop)
-Aplicația de Windows poate fi rulată direct din sursă sau instalată ca pachet nativ:
+### Windows (Desktop)
+Aplicatia de Windows poate fi rulata direct din sursa sau instalata ca pachet nativ:
 
-**Varianta Instalabilă (Recomandat):**
-1. Navighează în `focus_app`.
-2. Rulează comanda pentru a genera pachetul MSIX:
+**Varianta Instalabila (Recomandat):**
+1. Navigheaza in `focus_app`.
+2. Ruleaza comanda pentru a genera pachetul MSIX:
    ```bash
    flutter pub run msix:create
    ```
-3. Instalează fișierul generat (îl vei găsi în `focus_app/build/windows/x64/runner/Release`).
+3. Instaleaza fisierul generat (il vei gasi in `focus_app/build/windows/x64/runner/Release`).
 
 **Varianta de Dezvoltare:**
-1. Navighează în `focus_app`.
-2. Rulează comanda:
+1. Navigheaza in `focus_app`.
+2. Ruleaza comanda:
    ```bash
    flutter run -d windows
    ```
 
-## 📂 Project Structure
+## Structura Proiectului
 
-The repository is organized into two main components:
+Repository-ul este organizat in doua componente principale:
 
-* **`focus_app/`**: A Flutter-based application for Mobile (Android/iOS) and Desktop (Windows). This app runs in the background to monitor and block distracting applications based on your schedule.
-* **`extensie_web/`**: A Chrome Browser Extension (Manifest V3) that blocks distracting websites and integrates with your Google Calendar to automate focus sessions.
+* **`focus_app/`**: O aplicatie bazata pe Flutter pentru Mobil (Android/iOS) si Desktop (Windows). Aceasta aplicatie ruleaza in fundal pentru a monitoriza si bloca aplicatiile care te distrag in functie de programul tau.
+* **`extensie_web/`**: O extensie de browser Chrome (Manifest V3) care blocheaza site-urile care te distrag si se integreaza cu Google Calendar pentru a automatiza sesiunile de concentrare.
 
-## ✨ Features
+## Functionalitati
 
-### 📱 Mobile & Desktop App (`focus_app`)
+### Aplicatie Mobila & Desktop (`focus_app`)
 
-* **App Blocking:** Prevents access to specified distracting applications.
-* **Background Service:** Runs silently in the background to enforce rules without keeping the app open.
-* **Usage Statistics:** Tracks your app usage to help you understand your habits.
-* **Cross-Platform:** Built with Flutter for Android, iOS, and Windows.
-* **System Integration:** Uses native APIs for permissions, overlay windows, and process monitoring.
+* **Blocarea Aplicatiilor:** Previne accesul la aplicatiile specificate care distrag atentia.
+* **Serviciu in Fundal:** Ruleaza silentios in fundal pentru a impune regulile fara a tine aplicatia deschisa.
+* **Statistici de Utilizare:** Urmareste utilizarea aplicatiilor pentru a te ajuta sa iti intelegi obiceiurile.
+* **Cross-Platform:** Construita cu Flutter pentru Android, iOS si Windows.
+* **Integrare in Sistem:** Foloseste API-uri native pentru permisiuni, ferestre suprapuse si monitorizarea proceselor.
 
-### 🌐 Browser Extension (`extensie_web`)
+### Extensie de Browser (`extensie_web`)
 
-* **Website Blocking:** Uses the `declarativeNetRequest` API to block access to distracting URLs.
-* **Calendar Sync:** Integrates with Google Calendar to automatically enable "Focus Mode" during scheduled events.
-* **Custom Block Pages:** Displays a motivational or informative page when a site is blocked.
-* **Firebase Integration:** Syncs settings and data with the mobile app.
+* **Blocarea Site-urilor:** Foloseste API-ul `declarativeNetRequest` pentru a bloca accesul la URL-urile care te distrag.
+* **Sincronizare Calendar:** Se integreaza cu Google Calendar pentru a activa automat "Modul Concentrare" in timpul evenimentelor programate.
+* **Pagini de Blocare Personalizate:** Afiseaza o pagina motivationala sau informativa atunci cand un site este blocat.
+* **Integrare Firebase:** Sincronizeaza setarile si datele cu aplicatia mobila.
 
-## 🛠️ Tech Stack
+## Tehnologii Folosite
 
-* **Frontend (App):** [Flutter](https://flutter.dev/) (Dart)
-* **Frontend (Extension):** JavaScript, HTML, CSS, [Vite](https://vitejs.dev/)
-* **Backend / Sync:** [Firebase](https://firebase.google.com/) (Realtime Database, Auth)
-* **Authentication:** Google OAuth2, Firebase Auth
+* **Frontend (Aplicatie):** [Flutter](https://flutter.dev/) (Dart)
+* **Frontend (Extensie):** JavaScript, HTML, CSS, [Vite](https://vitejs.dev/)
+* **Backend / Sincronizare:** [Firebase](https://firebase.google.com/) (Realtime Database, Auth)
+* **Autentificare:** Google OAuth2, Firebase Auth
 
-## 🚀 Getting Started
+## Cum sa Incepi
 
-### Prerequisites
+### Cerinte preliminare
 
-* [Flutter SDK](https://docs.flutter.dev/get-started/install) installed.
-* [Node.js](https://nodejs.org/) and npm installed.
-* A Firebase project configured (with `google-services.json` for the app and web config for the extension).
+* [Flutter SDK](https://docs.flutter.dev/get-started/install) instalat.
+* [Node.js](https://nodejs.org/) si npm instalate.
+* Un proiect Firebase configurat (cu `google-services.json` pentru aplicatie si configurare web pentru extensie).
 
-### 1️⃣ Setting up the Flutter App
+### 1. Setarea Aplicatiei Flutter
 
-1. Navigate to the app directory:
+1. Navigheaza in directorul aplicatiei:
    ```bash
    cd focus_app
    ```
-2. Install dependencies:
+2. Instaleaza dependintele:
    ```bash
    flutter pub get
    ```
-3. Run the application:
+3. Ruleaza aplicatia:
    ```bash
-   # For Android/iOS
+   # Pentru Android/iOS
    flutter run
 
-   # For Windows
+   # Pentru Windows
    flutter run -d windows
    ```
 
-### 2️⃣ Setting up the Browser Extension
+### 2. Setarea Extensiei de Browser
 
-1. Navigate to the extension directory:
+1. Navigheaza in directorul extensiei:
 
    ```bash
    cd extensie_web
    ```
-2. Install dependencies:
+2. Instaleaza dependintele:
 
    ```bash
    npm install
    ```
-3. Build the extension:
+3. Construieste extensia:
 
    ```bash
    npx vite build
    ```
-   *This will generate a `dist` folder.*
-4. Load into Chrome:
+   *Aceasta va genera un folder `dist`.*
+4. Incarca in Chrome:
 
-   * Open Chrome and go to `chrome://extensions/`.
-   * Enable **Developer mode** (top right).
-   * Click **Load unpacked**.
-   * Select the `dist` folder created in the previous step.
+   * Deschide Chrome si mergi la `chrome://extensions/`.
+   * Activeaza **Developer mode** (Modul Dezvoltator) (dreapta sus).
+   * Da click pe **Load unpacked** (Incarca extensia neimpachetata).
+   * Selecteaza folderul `dist` creat la pasul anterior.
