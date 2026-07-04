@@ -1,3 +1,5 @@
+s
+
 # Descriere Livrabile Proiect
 
 ## 1. Adresa Repository
@@ -11,14 +13,17 @@
 - Locatie: `focus_app/`
 - Prerechizite: Flutter SDK, toolchain Android/Windows corespunzator
 - Instalare pachete:
+
   ```bash
   flutter pub get
   ```
 - Build Android (APK):
+
   ```bash
   flutter build apk
   ```
 - Build Windows (EXE):
+
   ```bash
   flutter build windows
   ```
@@ -30,10 +35,12 @@
 - Locatie: `extensie_web/`
 - Prerechizite: Node.js / npm
 - Instalare dependinte:
+
   ```bash
   npm install
   ```
 - Compilare proiect (Vite):
+
   ```bash
   npx vite build
   ```
@@ -56,4 +63,3 @@
 
 1. Se acceseaza `chrome://extensions/` din browser si se activeaza flag-ul **Developer mode**.
 2. Se foloseste optiunea **Load unpacked** si se selecteaza directorul `extensie_web/dist/`.
-
